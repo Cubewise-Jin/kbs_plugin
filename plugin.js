@@ -288,13 +288,6 @@ arc.directive("arcTemplate", function () {
               node.expanded = !node.expanded;
             };
 
-            $scope.onSelectNode = function (node, instance) {
-              $scope.values.selected_tm1_object = { instance, node };
-              $scope.values.selected_tm1_object_id = node._id;
-              console.log('selected_tm1_object_id =', $scope.values.selected_tm1_object_id);
-              console.log('selected =', $scope.values.selected_tm1_object);
-            };
-
             $scope.$on('tree:select', function (evt, payload) {
               evt.stopPropagation && evt.stopPropagation();
             
@@ -304,9 +297,6 @@ arc.directive("arcTemplate", function () {
               console.log('selected_tm1_object_id =', $scope.values.selected_tm1_object_id);
               console.log('selected =', $scope.values.selected_tm1_object);
             
-              // 這裡你可以順便把右側面板要的 info 帶走：
-              // payload.node.info 內含 Requirement/How to Use/... 等欄位
-              // console.log('SELECTED =>', payload.node._id, payload.node.info);
             });
 
             //Trigger an event after the login screen

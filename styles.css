@@ -215,6 +215,23 @@
 .tree-node.is-selected > .tree-row .caret{
   border-left-color: var(--primary-dark)
 }
- 
-
 /* tree style End ------------------------------------------- */
+.title{
+  display: flex;
+  align-items: center;
+  gap: 12px
+}
+
+.title .tm1-object-title{
+  color: var(--label-color);
+  font-weight: bold;
+}
+
+.title .tm1-object-name{
+  height: 30px;
+  background: var(--primary-dark);
+  color: #f5f5f5;
+  font-weight: 600;
+  font-size: 18px;
+  padding: 0 12px;
+}
