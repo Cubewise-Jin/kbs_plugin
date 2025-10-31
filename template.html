@@ -15,25 +15,30 @@
       <!-- Select -->
       <div class="field-wrap select">
         <label for="uiSelect" class="field-label">User Interface</label>
-        <select 
-          id="uiSelect"
-          class="kb-select kb-select--flex"
-          ng-model="selections.user_interface"
-          ng-change="onUIChange()"
-          ng-disabled="values.loading || values.error"
-        >
-          <option ng-repeat="e in values.user_interface_options track by e.Name" value="{{e.Name}}">
-            {{e.Name}}
-          </option>
-        </select>
-        <i class="fa fa-chevron-down kb-select-icon" aria-hidden="true"></i>
+        <div class="select-box">
+          <select 
+            id="uiSelect"
+            class="kb-select kb-select--flex"
+            ng-model="selections.user_interface"
+            ng-change="onUIChange()"
+            ng-disabled="values.loading || values.error"
+          >
+            <option ng-repeat="e in values.user_interface_options track by e.Name" value="{{e.Name}}">
+              {{e.Name}}
+            </option>
+          </select>
+          <i class="fa fa-chevron-down kb-select-icon" aria-hidden="true"></i>
+        </div>
       </div>
 
       <!-- Tree  -->
       <div class="kb-tree">
         <div class="tree-container" ng-repeat="data in values.tree_data track by data.instance">
           <!-- Instance row-->
-          <div class="tree-instance" ng-click="$event.stopPropagation(); data.expanded = !data.expanded">
+          <div 
+            class="tree-instance"
+            ng-click="onToggleInstance(data, $event)"
+          >
             <i class="caret" ng-class="{'open': data.expanded}"></i>
             <i class="fa fa-database instance-icon" aria-hidden="true"></i>
             <span class="instance-label">{{data.instance}}</span>
@@ -60,6 +65,114 @@
           class="tm1-object-name"
           ng-bind="values.selected_tm1_object_id">
         </span>
+      </div>
+      <div class="field-container">
+        <div 
+          class="field-wrap flex-column"
+          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id}"
+        >
+          <label class="field-label">Requirement</label>
+          <textarea 
+            class="kb-input" 
+            rows="3"
+            ng-disabled="values.loading || !values.selected_tm1_object_id"
+            ng-model="values.form['Requirement']"
+            ng-change="onFieldChange('Requirement')"
+          ></textarea>
+        </div>
+      
+        <!-- How to Use -->
+        <div 
+          class="field-wrap flex-column"
+          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id}"
+        >
+          <label class="field-label">How to Use</label>
+          <textarea 
+            class="kb-input" 
+            rows="3"
+            ng-disabled="values.loading || !values.selected_tm1_object_id"
+            ng-model="values.form['How to Use']"
+            ng-change="onFieldChange('How to Use')"
+          ></textarea>
+        </div>
+      
+        <!-- Maintenance -->
+        <div 
+          class="field-wrap flex-column"
+          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id}"
+        >
+          <label class="field-label">Maintenance</label>
+          <textarea 
+            class="kb-input" 
+            rows="3"
+            ng-disabled="values.loading || !values.selected_tm1_object_id"
+            ng-model="values.form['Maintenance']"
+            ng-change="onFieldChange('Maintenance')"
+          ></textarea>
+        </div>
+      
+        <!-- Relevant Biz Process -->
+        <div 
+          class="field-wrap flex-column"
+          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id}"
+        >
+          <label class="field-label">Relevant Biz Process</label>
+          <input 
+            class="kb-input" 
+            ng-disabled="true"
+            ng-model="values.form['Relevant Biz Process']"
+            ng-change="onFieldChange('Relevant Biz Process')"
+          ></textarea>
+        </div>
+      
+        <!-- Additional Information -->
+        <div 
+          class="field-wrap flex-column"
+          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id}"
+        >
+          <label class="field-label">Additional Information</label>
+          <textarea 
+            class="kb-input"
+            rows="3"
+            ng-disabled="values.loading || !values.selected_tm1_object_id"
+            ng-model="values.form['Additional Information']"
+            ng-change="onFieldChange('Additional Information')"
+          ></textarea>
+        </div>
+      
+        <!-- User Interface -->
+        <div 
+          class="field-wrap flex-column"
+          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id}"
+        >
+          <label class="field-label">User Interface</label>
+          <input 
+            class="kb-input" 
+            type="text"
+            ng-disabled="true"
+            ng-model="values.form['User Interface']"
+            ng-change="onFieldChange('User Interface')"
+          >
+        </div>
+      
+        <!-- Managers Sign Off -->
+        <div 
+          class="field-wrap flex-column"
+          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id}"
+        >
+          <label class="field-label">Managers Sign Off</label>
+          <div class="select-box">
+            <select 
+              class="kb-select"
+              ng-disabled="values.loading || !values.selected_tm1_object_id"
+              ng-model="values.form['Managers Sign Off']"
+              ng-options="opt.value as opt.label for opt in values.signOffOptions"
+              ng-change="onFieldChange('Managers Sign Off')"
+            >
+            </select>
+            <i class="fa fa-chevron-down kb-select-icon" aria-hidden="true"></i>
+          </div>
+        </div>
       </div>
     </div>
     

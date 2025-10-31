@@ -59,6 +59,15 @@ arc.directive("arcTemplate", function () {
                 selected_tm1_object_id: null,
             };
 
+            $scope.values.form = {};  
+            $scope.values.formOriginal = {};
+            $scope.values.updates = {};
+
+            $scope.values.signOffOptions = [
+              { label: "Y", value: "1" },
+              { label: "N", value: "" }
+            ];
+
             $scope.selections = { 
               user_interface: null 
             };  
@@ -277,10 +286,41 @@ arc.directive("arcTemplate", function () {
                 });
             };
 
+            // -
+            function ensureUpdatesBucket(instance, obj) {
+              if (!$scope.values.updates[instance]) $scope.values.updates[instance] = {};
+              if (!$scope.values.updates[instance][obj]) $scope.values.updates[instance][obj] = {};
+              return $scope.values.updates[instance][obj];
+            }
+
+            function cleanupUpdatesBucketIfEmpty(instance, obj) {
+              const box = $scope.values.updates[instance]?.[obj];
+              if (box && Object.keys(box).length === 0) {
+                delete $scope.values.updates[instance][obj];
+                if (Object.keys($scope.values.updates[instance]).length === 0) {
+                  delete $scope.values.updates[instance];
+                }
+              }
+            }
+
+            function normalizeSignOff(v) {
+              return (v === "1" || v === 1 || v === true || v === "Y") ? "1" : "";
+            }
+
             // Actions -----------------------
             $scope.onUIChange = function () {
               if (!$scope.selections.user_interface) return;
               $scope.loadInstanceObjectTree();
+            };
+
+            $scope.onToggleInstance = function (data, $event) {
+              if ($event && $event.stopPropagation) $event.stopPropagation();
+              data.expanded = !data.expanded;
+            
+              $scope.values.form = null;
+              $scope.values.formOriginal = null;
+              $scope.values.selected_tm1_object = null;
+              $scope.values.selected_tm1_object_id = null;
             };
 
             $scope.toggleTreeNode = function (node, $event) {
@@ -294,10 +334,39 @@ arc.directive("arcTemplate", function () {
               $scope.values.selected_tm1_object = payload;      
               $scope.values.selected_tm1_object_id = payload.node._id;
 
+              if (!payload.node.info) payload.node.info = {};
+              payload.node.info["Managers Sign Off"] = normalizeSignOff(payload.node.info["Managers Sign Off"]);
+
+              $scope.values.form = payload.node.info;
+              $scope.values.formOriginal = angular.copy($scope.values.form);
+
               console.log('selected_tm1_object_id =', $scope.values.selected_tm1_object_id);
               console.log('selected =', $scope.values.selected_tm1_object);
             
             });
+
+            $scope.onFieldChange = function (fieldKey) {
+              const curSel = $scope.values.selected_tm1_object || {};
+              const instance = curSel.instance;
+              const node = curSel.node;
+              if (!instance || !node) return;
+            
+              const tm1Object = node.tm1_object;
+              const cur = $scope.values.form[fieldKey];         
+              const old = $scope.values.formOriginal[fieldKey];
+            
+              if (cur === old) {
+                // update to orginal -> remove from updates 
+                if ($scope.values.updates[instance]?.[tm1Object]?.hasOwnProperty(fieldKey)) {
+                  delete $scope.values.updates[instance][tm1Object][fieldKey];
+                  cleanupUpdatesBucketIfEmpty(instance, tm1Object);
+                }
+              } else {
+                // new update -> add to updates
+                const bucket = ensureUpdatesBucket(instance, tm1Object);
+                bucket[fieldKey] = cur;
+              }
+            };
 
             //Trigger an event after the login screen
             $scope.$on("login-reload", function (event, args) {

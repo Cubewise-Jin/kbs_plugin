@@ -11,6 +11,18 @@
   --border-radius-sm: 6px;
   }
 
+/* Scrollbar cosmetic */
+::-webkit-scrollbar { 
+  width: 6px !important; 
+}
+::-webkit-scrollbar-thumb { 
+  background: var(--primary) !important; 
+  border-radius: var(--border-radius-md) !important; 
+}
+::-webkit-scrollbar-thumb:hover { 
+  background: var(--primary)
+}
+
 .kb-frame{
   color: var(--text-color)
 }
@@ -35,7 +47,9 @@
 
 .kb-box { 
   min-height: 600px;
-  flex: 1
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .kb-bar{
@@ -45,15 +59,50 @@
 }
 
 .field-wrap {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.field-wrap .field-label { 
- color: var(--label-color)
+.field-wrap.flex-column{
+  flex-direction: column;
+  align-items: flex-start;
+  gap:0
 }
+
+.field-wrap .field-label { 
+ color: var(--label-color);
+ margin: 2px 0px;
+}
+
+/* input style ------------------------------------------- */
+.field-wrap.disabled .kb-input{
+  opacity: .6;
+  cursor: not-allowed;
+  background: transparent;
+}
+
+.field-wrap.disabled .field-label{
+  opacity: .6;
+}
+
+.kb-input {
+  width: 100%; 
+  border: 1px solid var(--border-color); 
+  border-radius: var(--border-radius-md);
+  padding: 9px 12px; 
+  outline: none;
+  transition: border-color .2s, box-shadow .2s, background .2s;
+  font-size: 13px;
+}
+
+.kb-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+/* input style end ------------------------------------------- */
 
 /* select style  ------------------------------------------- */
 .kb-select {
@@ -68,6 +117,12 @@
   transition: box-shadow .15s ease, border-color .15s ease;
 }
 
+.select-box{
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
 .kb-select::-ms-expand { 
   display: none
 }
@@ -79,6 +134,7 @@
 .kb-select:focus {
   outline: none;
   border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
 }
 
 .kb-select:disabled {
@@ -86,7 +142,7 @@
   cursor: not-allowed;
 }
 
-.kb-select-icon {
+.select-box .kb-select-icon {
   position: absolute; 
   right: 10px; 
   top: 50%;
@@ -195,18 +251,6 @@
   padding: 2px 0;
 }
 
-/* Scrollbar cosmetic */
-.kb-tree::-webkit-scrollbar { 
-  width: 6px !important; 
-}
-.kb-tree::-webkit-scrollbar-thumb { 
-  background: var(--primary) !important; 
-  border-radius: var(--border-radius-md) !important; 
-}
-.kb-tree::-webkit-scrollbar-thumb:hover { 
-  background: var(--primary)
-}
-
 .tree-node.is-selected > .tree-row{
   color: var(--primary-dark);
   font-weight: 600;
@@ -216,6 +260,7 @@
   border-left-color: var(--primary-dark)
 }
 /* tree style End ------------------------------------------- */
+
 .title{
   display: flex;
   align-items: center;
@@ -234,4 +279,14 @@
   font-weight: 600;
   font-size: 18px;
   padding: 0 12px;
+}
+
+.field-container{
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
 }
