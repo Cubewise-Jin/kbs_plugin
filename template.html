@@ -1,0 +1,63 @@
+<div class="container-fluid kb-frame">
+  <style>@import url("__/plugins/template-page/styles.css");</style>
+
+  <!-- Header -->
+  <div class="kb-header">
+    <div class="title">
+      TM1 SYSTEM KNOWLEDGE BASE MAINTENANCE SYSTEM
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="kb-body" style="gap:12px;">
+    <!-- Left panel -->
+    <div class="kb-bar">
+      <!-- Select -->
+      <div class="field-wrap select">
+        <label for="uiSelect" class="field-label">User Interface</label>
+        <select 
+          id="uiSelect"
+          class="kb-select kb-select--flex"
+          ng-model="selections.user_interface"
+          ng-change="onUIChange()"
+          ng-disabled="values.loading || values.error"
+        >
+          <option ng-repeat="e in values.user_interface_options track by e.Name" value="{{e.Name}}">
+            {{e.Name}}
+          </option>
+        </select>
+        <i class="fa fa-chevron-down kb-select-icon" aria-hidden="true"></i>
+      </div>
+
+      <!-- Tree  -->
+      <div class="kb-tree">
+        <div class="tree-container" ng-repeat="data in values.tree_data track by data.instance">
+          <!-- Instance row-->
+          <div class="tree-instance" ng-click="$event.stopPropagation(); data.expanded = !data.expanded">
+            <i class="caret" ng-class="{'open': data.expanded}"></i>
+            <i class="fa fa-database instance-icon" aria-hidden="true"></i>
+            <span class="instance-label">{{data.instance}}</span>
+          </div>
+
+          <ul class="tree-root" ng-if="data.expanded">
+            <tree-node
+              ng-repeat="node in data.tm1_objects track by node._id"
+              node="node"
+              instance="data.instance"
+              selected-id="values.selected_tm1_object_id"
+              on-select="onSelectNode(node, instance)">
+            </tree-node>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right panel -->
+    <div class="kb-box">
+      <div class="placeholder">
+        <i class="fa fa-info-circle" aria-hidden="true"></i>
+        <span>Details panel (coming soon)</span>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,220 @@
+:root {
+  --border-color: #c9c9c9;
+  --label-color: #3f3f3f;
+  --primary: #a4caef;   
+  --primary-dark: #4075a9;
+  --primary-light: #e8f2fd;
+  --disable: #a5a5a5;
+  --gray: #f5f5f5;
+  --text-color: #222222;
+  --border-radius-md: 8px;
+  --border-radius-sm: 6px;
+  }
+
+.kb-frame{
+  color: var(--text-color)
+}
+
+.kb-header { 
+  border-bottom: 1px solid var(--border-color); 
+  padding-bottom: 8px; 
+  margin-bottom: 12px; 
+}
+
+.kb-header .title{ 
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.kb-body { 
+  width: 100%;
+  gap: 12px;
+  display: flex;
+  height: calc(100vh - 160px);
+}
+
+.kb-box { 
+  min-height: 600px;
+  flex: 1
+}
+
+.kb-bar{
+  display: flex;
+  flex-direction: column;
+  width: 450px
+}
+
+.field-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.field-wrap .field-label { 
+ color: var(--label-color)
+}
+
+/* select style  ------------------------------------------- */
+.kb-select {
+  min-width: 240px;
+  padding: 6px 36px 6px 10px;      
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  line-height: 1.4;
+  appearance: none;                  
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+
+.kb-select::-ms-expand { 
+  display: none
+}
+
+.kb-select:hover {
+  border-color: var(--primary);
+}
+
+.kb-select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.kb-select:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+.kb-select-icon {
+  position: absolute; 
+  right: 10px; 
+  top: 50%;
+  transform: translateY(-50%); 
+  pointer-events: none; 
+  opacity: .85;
+  font-size: 10px;
+  transition: ease 0.4s all;
+  color: var(--label-color);
+}
+
+.kb-select:focus + .kb-select-icon{
+  transform: translateY(-35%) rotate(180deg);
+  color: var(--primary);
+}
+
+.kb-select--sm { min-width: 180px; padding: 4px 34px 4px 8px; border-radius: 4px; }
+.kb-select--md { min-width: 240px; }
+.kb-select--flex { flex: 1; }
+/* select style End ------------------------------------------- */
+
+/* tree style ------------------------------------------- */
+.kb-tree {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;        
+  padding-right: 8px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+/* Instance row */
+.tree-instance {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--primary-light);
+  border-radius: var(--border-radius-sm);
+  padding: 4px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.tree-instance:hover { 
+  filter: brightness(1.02);
+}
+
+.instance-icon { 
+  color: var(--primary-dark)
+}
+
+.instance-label { 
+  font-weight: 600 
+}
+
+/* Caret */
+.caret-box{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* background: #c8fdff; */
+  width: 30px;
+  height: 20px;
+}
+.caret-box.hidden { visibility: hidden; }
+
+.caret {
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 6px solid var(--disable);
+  transition: transform .15s ease, border-left-color .15s ease;
+}
+.caret.open { 
+  transform: rotate(90deg); 
+  border-left-color: var(--label-color); 
+}
+
+/* UL / LI Base */
+.tree-root, .tree-children {
+  list-style: none;
+  margin: 0;
+  padding-left: 16px;
+}
+
+.tree-node { 
+  margin: 1px 0; 
+}
+
+/* Node row (all non-instance levels) */
+.tree-row {
+  display: flex;
+  align-items: center;
+  padding-right: 4px;
+  padding-left: 0;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  user-select: none;
+}
+.tree-row:hover { 
+  background: var(--gray);
+}
+
+.tree-label { 
+  font-size: 13px;
+  padding: 2px 0;
+}
+
+/* Scrollbar cosmetic */
+.kb-tree::-webkit-scrollbar { 
+  width: 6px !important; 
+}
+.kb-tree::-webkit-scrollbar-thumb { 
+  background: var(--primary) !important; 
+  border-radius: var(--border-radius-md) !important; 
+}
+.kb-tree::-webkit-scrollbar-thumb:hover { 
+  background: var(--primary)
+}
+
+.tree-node.is-selected > .tree-row{
+  color: var(--primary-dark);
+  font-weight: 600;
+}
+
+.tree-node.is-selected > .tree-row .caret{
+  border-left-color: var(--primary-dark)
+}
+ 
+
+/* tree style End ------------------------------------------- */
