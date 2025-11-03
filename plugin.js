@@ -57,16 +57,15 @@ arc.directive("arcTemplate", function () {
                 tree_data: [],
                 selected_tm1_object: null,
                 selected_tm1_object_id: null,
+                updates: {},
+                updatesMeta: {},
+                form: {},
+                formOriginal: {},
+                sign_off_options: [
+                  { label: "Y", value: "1" },
+                  { label: "N", value: "" }
+                ]
             };
-
-            $scope.values.form = {};  
-            $scope.values.formOriginal = {};
-            $scope.values.updates = {};
-
-            $scope.values.signOffOptions = [
-              { label: "Y", value: "1" },
-              { label: "N", value: "" }
-            ];
 
             $scope.selections = { 
               user_interface: null 
@@ -79,6 +78,21 @@ arc.directive("arcTemplate", function () {
 
             function valOf(cell) {
               return cell?.FormattedValue ?? cell?.Text ?? cell?.Value ?? "";
+            }
+
+            function findNodeByInstanceAndObject(instance, tm1Object) {
+              const pack = ($scope.values.tree_data || []).find(x => x.instance === instance);
+              if (!pack) return null;
+            
+              function dfs(list) {
+                for (const n of (list || [])) {
+                  if (n.tm1_object === tm1Object) return n;
+                  const hit = dfs(n.nodes);
+                  if (hit) return hit;
+                }
+                return null;
+              }
+              return dfs(pack.tm1_objects);
             }
 
             // === Load elements from a dimension ===
@@ -286,11 +300,19 @@ arc.directive("arcTemplate", function () {
                 });
             };
 
-            // -
+            // 
             function ensureUpdatesBucket(instance, obj) {
               if (!$scope.values.updates[instance]) $scope.values.updates[instance] = {};
               if (!$scope.values.updates[instance][obj]) $scope.values.updates[instance][obj] = {};
               return $scope.values.updates[instance][obj];
+            }
+
+            function ensureUpdatesMetaWithOriginal(instance, obj, originalInfo) {
+              if (!$scope.values.updatesMeta[instance]) $scope.values.updatesMeta[instance] = {};
+              if (!$scope.values.updatesMeta[instance][obj]) {
+                $scope.values.updatesMeta[instance][obj] = { original: angular.copy(originalInfo || {}) };
+              }
+              return $scope.values.updatesMeta[instance][obj];
             }
 
             function cleanupUpdatesBucketIfEmpty(instance, obj) {
@@ -299,6 +321,12 @@ arc.directive("arcTemplate", function () {
                 delete $scope.values.updates[instance][obj];
                 if (Object.keys($scope.values.updates[instance]).length === 0) {
                   delete $scope.values.updates[instance];
+                }
+                if ($scope.values.updatesMeta[instance]?.[obj]) {
+                  delete $scope.values.updatesMeta[instance][obj];
+                  if (Object.keys($scope.values.updatesMeta[instance]).length === 0) {
+                    delete $scope.values.updatesMeta[instance];
+                  }
                 }
               }
             }
@@ -346,10 +374,15 @@ arc.directive("arcTemplate", function () {
             });
 
             $scope.onFieldChange = function (fieldKey) {
+              console.log('onFieldChange =', fieldKey)
               const curSel = $scope.values.selected_tm1_object || {};
               const instance = curSel.instance;
               const node = curSel.node;
               if (!instance || !node) return;
+
+              if (fieldKey === "Managers Sign Off") {
+                $scope.values.form[fieldKey] = normalizeSignOff($scope.values.form[fieldKey]);
+              }
             
               const tm1Object = node.tm1_object;
               const cur = $scope.values.form[fieldKey];         
@@ -362,10 +395,57 @@ arc.directive("arcTemplate", function () {
                   cleanupUpdatesBucketIfEmpty(instance, tm1Object);
                 }
               } else {
+                ensureUpdatesMetaWithOriginal(instance, tm1Object, $scope.values.formOriginal);
                 // new update -> add to updates
                 const bucket = ensureUpdatesBucket(instance, tm1Object);
                 bucket[fieldKey] = cur;
               }
+              node.info[fieldKey] = cur;
+              console.log('updates =', $scope.values.updates)
+            };
+
+            $scope.hasUpdates = function () {
+              return Object.keys($scope.values.updates).length > 0;
+            };
+
+            $scope.onSaveAll = function () {
+              if (!$scope.hasUpdates()) return;
+            
+              const payload = angular.copy($scope.values.updates);
+              console.log("[SAVE] outgoing payload =", payload);
+            
+              $scope.values.updates = {};
+              $scope.values.updatesMeta = {};
+            
+              if ($scope.values.selected_tm1_object?.node?.info) {
+                $scope.values.formOriginal = angular.copy($scope.values.form);
+              }
+            };
+
+            $scope.onDiscardAll = function () {
+              Object.keys($scope.values.updatesMeta).forEach(inst => {
+                const perInst = $scope.values.updatesMeta[inst] || {};
+                Object.keys(perInst).forEach(obj => {
+                  const original = perInst[obj]?.original || {};
+                  const node = findNodeByInstanceAndObject(inst, obj);
+                  if (node) {
+                    node.info = angular.copy(original);
+                  }
+                  const isCurrent = $scope.values.selected_tm1_object
+                    && $scope.values.selected_tm1_object.instance === inst
+                    && $scope.values.selected_tm1_object.node
+                    && $scope.values.selected_tm1_object.node.tm1_object === obj;
+            
+                  if (isCurrent) {
+                    $scope.values.form = angular.copy(original);
+                    $scope.values.formOriginal = angular.copy(original);
+                    $scope.values.selected_tm1_object.node.info = $scope.values.form;
+                  }
+                });
+              });
+            
+              $scope.values.updates = {};
+              $scope.values.updatesMeta = {};
             };
 
             //Trigger an event after the login screen

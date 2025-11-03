@@ -6,6 +6,14 @@
     <div class="title">
       TM1 SYSTEM KNOWLEDGE BASE MAINTENANCE SYSTEM
     </div>
+    <div class="button-box">
+      <button class="kb-btn fill" ng-click="onSaveAll()" ng-disabled="!hasUpdates() || values.loading">
+        Save
+      </button>
+      <button class="kb-btn outline" ng-click="onDiscardAll()" ng-disabled="!hasUpdates() || values.loading">
+        Discard
+      </button>
+    </div>
   </div>
 
   <!-- Body -->
@@ -63,10 +71,13 @@
         <span class="tm1-object-title">TM1 Object</span>
         <span 
           class="tm1-object-name"
+          ng-if="values.selected_tm1_object_id"
           ng-bind="values.selected_tm1_object_id">
         </span>
       </div>
       <div class="field-container">
+
+        <!-- Requirement -->
         <div 
           class="field-wrap flex-column"
           ng-class="{'disabled': values.loading || !values.selected_tm1_object_id}"
@@ -166,7 +177,7 @@
               class="kb-select"
               ng-disabled="values.loading || !values.selected_tm1_object_id"
               ng-model="values.form['Managers Sign Off']"
-              ng-options="opt.value as opt.label for opt in values.signOffOptions"
+              ng-options="opt.value as opt.label for opt in values.sign_off_options"
               ng-change="onFieldChange('Managers Sign Off')"
             >
             </select>
