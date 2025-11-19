@@ -95,6 +95,51 @@ arc.directive("arcTemplate", function () {
               return dfs(pack.tm1_objects);
             }
 
+
+            function esc(s) { return String(s || "").replace(/'/g, "''"); }
+            function normalizeSignOff(v){ return (v==="1"||v===1||v===true||v==="Y")?"1":""; }
+            function toStoredValue(measure, val){
+              return (measure === "Managers Sign Off") ? normalizeSignOff(val) : (val == null ? "" : String(val));
+            }
+            
+            function buildUpdatePayloadsFromUpdates() {
+              const uiType = $scope.selections.user_interface;
+              if (!uiType) return [];
+            
+              const updates = $scope.values.updates || {};
+              const payload = [];
+            
+              Object.keys(updates).forEach(function (inst) {
+                const perObj = updates[inst] || {};
+            
+                Object.keys(perObj).forEach(function (obj) {
+                  const perMeasure = perObj[obj] || {};
+            
+                  Object.keys(perMeasure).forEach(function (measure) {
+                    const rawVal = perMeasure[measure];
+                    const value = toStoredValue(measure, rawVal);
+            
+                    payload.push({
+                      "Cells": [
+                        {
+                          "Tuple@odata.bind": [
+                            "Dimensions('Instance')/Hierarchies('Instance')/Elements('" + esc(inst) + "')",
+                            "Dimensions('TM1 Object Type')/Hierarchies('TM1 Object Type')/Elements('" + esc(uiType) + "')",
+                            "Dimensions('TM1 Object')/Hierarchies('TM1 Object')/Elements('" + esc(obj) + "')",
+                            "Dimensions('Update Record')/Hierarchies('Update Record')/Elements('" + esc(ELEM_UPDATE) + "')",
+                            "Dimensions('M Sys Documentation')/Hierarchies('M Sys Documentation')/Elements('" + esc(measure) + "')"
+                          ]
+                        }
+                      ],
+                      "Value": value
+                    });
+                  });
+                });
+              });
+            
+              return payload;
+            }
+
             // === Load elements from a dimension ===
             $scope.loadElements = function (dim, container) {
                 $scope.values.loading = true;
@@ -289,7 +334,6 @@ arc.directive("arcTemplate", function () {
                     expanded: true,
                     tm1_objects: mergeTree(baseTree, (o) => doc.cellMap[`${inst}|${o}`], inst),
                   }));
-                  console.log("tree_data =", $scope.values.tree_data);
                 })
                 .catch((err) => {
                   $scope.values.error = err?.data?.error?.message || err?.statusText || "Load failed";
@@ -339,6 +383,11 @@ arc.directive("arcTemplate", function () {
             $scope.onUIChange = function () {
               if (!$scope.selections.user_interface) return;
               $scope.loadInstanceObjectTree();
+
+              $scope.values.form = null;
+              $scope.values.formOriginal = null;
+              $scope.values.selected_tm1_object = null;
+              $scope.values.selected_tm1_object_id = null;
             };
 
             $scope.onToggleInstance = function (data, $event) {
@@ -367,14 +416,10 @@ arc.directive("arcTemplate", function () {
 
               $scope.values.form = payload.node.info;
               $scope.values.formOriginal = angular.copy($scope.values.form);
-
-              console.log('selected_tm1_object_id =', $scope.values.selected_tm1_object_id);
-              console.log('selected =', $scope.values.selected_tm1_object);
             
             });
 
             $scope.onFieldChange = function (fieldKey) {
-              console.log('onFieldChange =', fieldKey)
               const curSel = $scope.values.selected_tm1_object || {};
               const instance = curSel.instance;
               const node = curSel.node;
@@ -401,7 +446,6 @@ arc.directive("arcTemplate", function () {
                 bucket[fieldKey] = cur;
               }
               node.info[fieldKey] = cur;
-              console.log('updates =', $scope.values.updates)
             };
 
             $scope.hasUpdates = function () {
@@ -410,16 +454,41 @@ arc.directive("arcTemplate", function () {
 
             $scope.onSaveAll = function () {
               if (!$scope.hasUpdates()) return;
+              $scope.values.loading = true;
+              $scope.values.error = null;
             
-              const payload = angular.copy($scope.values.updates);
-              console.log("[SAVE] outgoing payload =", payload);
-            
-              $scope.values.updates = {};
-              $scope.values.updatesMeta = {};
-            
-              if ($scope.values.selected_tm1_object?.node?.info) {
-                $scope.values.formOriginal = angular.copy($scope.values.form);
+          
+              const body = buildUpdatePayloadsFromUpdates();
+              if (!body.length) {
+                $scope.values.loading = false;
+                return;
               }
+            
+              const url = "/Cubes('" + CUBE_NAME + "')/tm1.Update";       
+            
+              $tm1.async(FIXED_INSTANCE, "POST", url, body)
+                .then(function (res) {
+                  $scope.values.updates = {};
+                  $scope.values.updatesMeta = {};
+
+                  if ($scope.values.selected_tm1_object &&
+                      $scope.values.selected_tm1_object.node &&
+                      $scope.values.selected_tm1_object.node.info) {
+                    $scope.values.formOriginal = angular.copy($scope.values.form);
+                    $scope.values.selected_tm1_object.node.info = angular.copy($scope.values.form);
+                  }
+                })
+                .catch(function (err) {
+                  $scope.values.error =
+                    (err && err.data && err.data.error && err.data.error.message) ||
+                    err.statusText ||
+                    err.message ||
+                    "Save failed";
+                })
+                .finally(function () {
+                  $scope.values.loading = false;
+                  $scope.$applyAsync();
+                });
             };
 
             $scope.onDiscardAll = function () {
