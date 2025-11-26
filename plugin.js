@@ -38,6 +38,7 @@ arc.directive("arcTemplate", function () {
             const DIM_UPDATE_RECORD = "Update Record";
             const DIM_M_SYS_DOCUMENTATION = "M Sys Documentation"
             const ELEM_UPDATE = "Update Input";
+            const TI_UPDATE = "Sys Documentation.Update Sign Off";
 
             const M_SYS_DOCUMENTATION_KEYS = [
               "Requirement",
@@ -46,7 +47,8 @@ arc.directive("arcTemplate", function () {
               "Relevant Biz Process",
               "Additional Information",
               "User Interface",
-              "Managers Sign Off"
+              "Managers Sign Off",
+              "Status"
             ];
           
             // === Data holders ===
@@ -103,39 +105,43 @@ arc.directive("arcTemplate", function () {
             }
             
             function buildUpdatePayloadsFromUpdates() {
-              const uiType = $scope.selections.user_interface;
-              if (!uiType) return [];
-            
-              const updates = $scope.values.updates || {};
+              const updatesByUI = $scope.values.updates || {};
               const payload = [];
             
-              Object.keys(updates).forEach(function (inst) {
-                const perObj = updates[inst] || {};
+              Object.keys(updatesByUI).forEach(function (uiType) {
+                const perInst = updatesByUI[uiType] || {};
             
-                Object.keys(perObj).forEach(function (obj) {
-                  const perMeasure = perObj[obj] || {};
+                Object.keys(perInst).forEach(function (inst) {
+                  const perObj = perInst[inst] || {};
             
-                  Object.keys(perMeasure).forEach(function (measure) {
-                    const rawVal = perMeasure[measure];
-                    const value = toStoredValue(measure, rawVal);
+                  Object.keys(perObj).forEach(function (obj) {
+                    const perMeasure = perObj[obj] || {};
             
-                    payload.push({
-                      "Cells": [
-                        {
-                          "Tuple@odata.bind": [
-                            "Dimensions('Instance')/Hierarchies('Instance')/Elements('" + esc(inst) + "')",
-                            "Dimensions('TM1 Object Type')/Hierarchies('TM1 Object Type')/Elements('" + esc(uiType) + "')",
-                            "Dimensions('TM1 Object')/Hierarchies('TM1 Object')/Elements('" + esc(obj) + "')",
-                            "Dimensions('Update Record')/Hierarchies('Update Record')/Elements('" + esc(ELEM_UPDATE) + "')",
-                            "Dimensions('M Sys Documentation')/Hierarchies('M Sys Documentation')/Elements('" + esc(measure) + "')"
-                          ]
-                        }
-                      ],
-                      "Value": value
+                    Object.keys(perMeasure).forEach(function (measure) {
+                      const rawVal = perMeasure[measure];
+                      const value = toStoredValue(measure, rawVal);
+            
+                      payload.push({
+                        "Cells": [
+                          {
+                            "Tuple@odata.bind": [
+                              "Dimensions('Instance')/Hierarchies('Instance')/Elements('" + esc(inst) + "')",
+                              "Dimensions('TM1 Object Type')/Hierarchies('TM1 Object Type')/Elements('" + esc(uiType) + "')",
+                              "Dimensions('TM1 Object')/Hierarchies('TM1 Object')/Elements('" + esc(obj) + "')",
+                              "Dimensions('Update Record')/Hierarchies('Update Record')/Elements('" + esc(ELEM_UPDATE) + "')",
+                              "Dimensions('M Sys Documentation')/Hierarchies('M Sys Documentation')/Elements('" + esc(measure) + "')"
+                            ]
+                          }
+                        ],
+                        "Value": value
+                      });
                     });
                   });
                 });
               });
+            
+              console.log("updates ===", updatesByUI);
+              console.log("payload ===", payload);
             
               return payload;
             }
@@ -334,6 +340,8 @@ arc.directive("arcTemplate", function () {
                     expanded: true,
                     tm1_objects: mergeTree(baseTree, (o) => doc.cellMap[`${inst}|${o}`], inst),
                   }));
+
+                  console.log('tree_data ===', $scope.values.tree_data)
                 })
                 .catch((err) => {
                   $scope.values.error = err?.data?.error?.message || err?.statusText || "Load failed";
@@ -344,32 +352,44 @@ arc.directive("arcTemplate", function () {
                 });
             };
 
-            // 
-            function ensureUpdatesBucket(instance, obj) {
-              if (!$scope.values.updates[instance]) $scope.values.updates[instance] = {};
-              if (!$scope.values.updates[instance][obj]) $scope.values.updates[instance][obj] = {};
-              return $scope.values.updates[instance][obj];
+            // Build update record
+            function ensureUpdatesBucket(uiType, instance, obj) {
+              if (!$scope.values.updates[uiType]) $scope.values.updates[uiType] = {};
+              if (!$scope.values.updates[uiType][instance]) $scope.values.updates[uiType][instance] = {};
+              if (!$scope.values.updates[uiType][instance][obj]) $scope.values.updates[uiType][instance][obj] = {};
+              return $scope.values.updates[uiType][instance][obj];
             }
 
-            function ensureUpdatesMetaWithOriginal(instance, obj, originalInfo) {
-              if (!$scope.values.updatesMeta[instance]) $scope.values.updatesMeta[instance] = {};
-              if (!$scope.values.updatesMeta[instance][obj]) {
-                $scope.values.updatesMeta[instance][obj] = { original: angular.copy(originalInfo || {}) };
+            function ensureUpdatesMetaWithOriginal(uiType, instance, obj, originalInfo) {
+              if (!$scope.values.updatesMeta[uiType]) $scope.values.updatesMeta[uiType] = {};
+              if (!$scope.values.updatesMeta[uiType][instance]) $scope.values.updatesMeta[uiType][instance] = {};
+              if (!$scope.values.updatesMeta[uiType][instance][obj]) {
+                $scope.values.updatesMeta[uiType][instance][obj] = {
+                  original: angular.copy(originalInfo || {})
+                };
               }
-              return $scope.values.updatesMeta[instance][obj];
+              return $scope.values.updatesMeta[uiType][instance][obj];
             }
 
-            function cleanupUpdatesBucketIfEmpty(instance, obj) {
-              const box = $scope.values.updates[instance]?.[obj];
+            function cleanupUpdatesBucketIfEmpty(uiType, instance, obj) {
+              const box = $scope.values.updates[uiType]?.[instance]?.[obj];
               if (box && Object.keys(box).length === 0) {
-                delete $scope.values.updates[instance][obj];
-                if (Object.keys($scope.values.updates[instance]).length === 0) {
-                  delete $scope.values.updates[instance];
+                delete $scope.values.updates[uiType][instance][obj];
+            
+                if (Object.keys($scope.values.updates[uiType][instance]).length === 0) {
+                  delete $scope.values.updates[uiType][instance];
                 }
-                if ($scope.values.updatesMeta[instance]?.[obj]) {
-                  delete $scope.values.updatesMeta[instance][obj];
-                  if (Object.keys($scope.values.updatesMeta[instance]).length === 0) {
-                    delete $scope.values.updatesMeta[instance];
+                if (Object.keys($scope.values.updates[uiType]).length === 0) {
+                  delete $scope.values.updates[uiType];
+                }
+            
+                if ($scope.values.updatesMeta[uiType]?.[instance]?.[obj]) {
+                  delete $scope.values.updatesMeta[uiType][instance][obj];
+                  if (Object.keys($scope.values.updatesMeta[uiType][instance]).length === 0) {
+                    delete $scope.values.updatesMeta[uiType][instance];
+                  }
+                  if (Object.keys($scope.values.updatesMeta[uiType]).length === 0) {
+                    delete $scope.values.updatesMeta[uiType];
                   }
                 }
               }
@@ -379,10 +399,29 @@ arc.directive("arcTemplate", function () {
               return (v === "1" || v === 1 || v === true || v === "Y") ? "1" : "";
             }
 
+            function executeUpdateTI(instance, objType, obj, method) {
+            
+              const tiUrl = "/Processes('" + TI_UPDATE + "')/tm1.Execute";
+            
+              const body = {
+                Parameters: [
+                  { Name: "pDebug",    Value: "0" },
+                  { Name: "pInstance", Value: instance },
+                  { Name: "pObjType",  Value: objType },
+                  { Name: "pObj",      Value: obj},
+                  { Name: "pMethod",   Value: method }
+                ]
+              };
+ 
+              return $tm1.async(FIXED_INSTANCE, "POST", tiUrl, body);
+            }
+
             // Actions -----------------------
             $scope.onUIChange = function () {
               if (!$scope.selections.user_interface) return;
+              $scope.values.tree_data = []
               $scope.loadInstanceObjectTree();
+
 
               $scope.values.form = null;
               $scope.values.formOriginal = null;
@@ -423,7 +462,8 @@ arc.directive("arcTemplate", function () {
               const curSel = $scope.values.selected_tm1_object || {};
               const instance = curSel.instance;
               const node = curSel.node;
-              if (!instance || !node) return;
+              const uiType = $scope.selections.user_interface;
+              if (!instance || !node || !uiType) return;
 
               if (fieldKey === "Managers Sign Off") {
                 $scope.values.form[fieldKey] = normalizeSignOff($scope.values.form[fieldKey]);
@@ -437,12 +477,12 @@ arc.directive("arcTemplate", function () {
                 // update to orginal -> remove from updates 
                 if ($scope.values.updates[instance]?.[tm1Object]?.hasOwnProperty(fieldKey)) {
                   delete $scope.values.updates[instance][tm1Object][fieldKey];
-                  cleanupUpdatesBucketIfEmpty(instance, tm1Object);
+                  cleanupUpdatesBucketIfEmpty(uiType, instance, tm1Object);
                 }
               } else {
                 ensureUpdatesMetaWithOriginal(instance, tm1Object, $scope.values.formOriginal);
                 // new update -> add to updates
-                const bucket = ensureUpdatesBucket(instance, tm1Object);
+                const bucket = ensureUpdatesBucket(uiType, instance, tm1Object);
                 bucket[fieldKey] = cur;
               }
               node.info[fieldKey] = cur;
@@ -467,6 +507,7 @@ arc.directive("arcTemplate", function () {
               const url = "/Cubes('" + CUBE_NAME + "')/tm1.Update";       
             
               $tm1.async(FIXED_INSTANCE, "POST", url, body)
+
                 .then(function (res) {
                   $scope.values.updates = {};
                   $scope.values.updatesMeta = {};
@@ -492,24 +533,32 @@ arc.directive("arcTemplate", function () {
             };
 
             $scope.onDiscardAll = function () {
-              Object.keys($scope.values.updatesMeta).forEach(inst => {
-                const perInst = $scope.values.updatesMeta[inst] || {};
-                Object.keys(perInst).forEach(obj => {
-                  const original = perInst[obj]?.original || {};
-                  const node = findNodeByInstanceAndObject(inst, obj);
-                  if (node) {
-                    node.info = angular.copy(original);
-                  }
-                  const isCurrent = $scope.values.selected_tm1_object
-                    && $scope.values.selected_tm1_object.instance === inst
-                    && $scope.values.selected_tm1_object.node
-                    && $scope.values.selected_tm1_object.node.tm1_object === obj;
+              Object.keys($scope.values.updatesMeta).forEach(uiType => {
+                const perUI = $scope.values.updatesMeta[uiType] || {};
             
-                  if (isCurrent) {
-                    $scope.values.form = angular.copy(original);
-                    $scope.values.formOriginal = angular.copy(original);
-                    $scope.values.selected_tm1_object.node.info = $scope.values.form;
-                  }
+                Object.keys(perUI).forEach(inst => {
+                  const perInst = perUI[inst] || {};
+            
+                  Object.keys(perInst).forEach(obj => {
+                    const original = perInst[obj]?.original || {};
+                    const node = findNodeByInstanceAndObject(inst, obj);
+            
+                    if (node) {
+                      node.info = angular.copy(original);
+                    }
+            
+                    const isCurrent =
+                      $scope.values.selected_tm1_object &&
+                      $scope.values.selected_tm1_object.instance === inst &&
+                      $scope.values.selected_tm1_object.node &&
+                      $scope.values.selected_tm1_object.node.tm1_object === obj;
+            
+                    if (isCurrent) {
+                      $scope.values.form = angular.copy(original);
+                      $scope.values.formOriginal = angular.copy(original);
+                      $scope.values.selected_tm1_object.node.info = $scope.values.form;
+                    }
+                  });
                 });
               });
             
@@ -557,6 +606,11 @@ arc.directive("treeNode", function ($compile) {
             <i class="caret" ng-class="{'open': node.expanded}"></i>
           </div>
           <span class="tree-label">{{node.tm1_object}}</span>
+          <div 
+            class="status-light" 
+            ng-class="statusClass(node.info.Status)"
+            ng-if="node.info"
+          ></div>
         </div>
       </li>
     `,
@@ -573,6 +627,23 @@ arc.directive("treeNode", function ($compile) {
           </ul>`;
         element.append($compile(tpl)(scope));
       }
+
+      scope.statusClass = function (status) {
+        if (!status) return 'st-not-start';
+      
+        switch (status.toLowerCase()) {
+          case 'Not Start':
+            return 'st-not-start';
+          case 'Start':
+            return 'st-start';
+          case 'Partial Finished':
+            return 'st-partial';
+          case 'Finished':
+            return 'st-finished';
+          default:
+            return 'st-not-start';
+        }
+      };
     }
   };
 });
