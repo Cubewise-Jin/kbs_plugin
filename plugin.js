@@ -38,7 +38,7 @@ arc.directive("arcTemplate", function () {
             const DIM_UPDATE_RECORD = "Update Record";
             const DIM_M_SYS_DOCUMENTATION = "M Sys Documentation"
             const ELEM_UPDATE = "Update Input";
-            const TI_UPDATE = "Sys Documentation.Update Sign Off";
+            const TI_UPDATE = "Cub.Sys Documentation.Update Sign Off";
 
             const M_SYS_DOCUMENTATION_KEYS = [
               "Requirement",
@@ -328,18 +328,41 @@ arc.directive("arcTemplate", function () {
             // Load Tree 
             $scope.loadInstanceObjectTree = function () {
               const uiType = $scope.selections.user_interface;
-              if (!uiType) return;
+              if (!uiType) return Promise.resolve();
     
+              const prevExpanded = snapshotExpanded($scope.values.tree_data);
               $scope.values.loading = true;
-              Promise.all([fetchEdges(), fetchDocCells(uiType)])
+             
+              return Promise.all([fetchEdges(), fetchDocCells(uiType)])
                 .then(([edges, doc]) => {
                   const baseTree = buildTreeFromEdges(edges);
 
-                  $scope.values.tree_data = doc.instances.map((inst) => ({
-                    instance: inst,
-                    expanded: true,
-                    tm1_objects: mergeTree(baseTree, (o) => doc.cellMap[`${inst}|${o}`], inst),
-                  }));
+                  $scope.values.tree_data = doc.instances.map((inst) => {
+                    const tm1_objects = mergeTree(
+                      baseTree,
+                      (o) => doc.cellMap[`${inst}|${o}`],
+                      inst
+                    );
+            
+                    const instSnap = prevExpanded[inst];
+                    const instExpanded = instSnap ? instSnap.instanceExpanded : true;
+                    const nodeExpandedMap = instSnap ? instSnap.nodeExpanded : {};
+            
+                    function applyExpanded(node) {
+                      if (nodeExpandedMap[node._id]) {
+                        node.expanded = true;
+                      }
+                      (node.nodes || []).forEach(applyExpanded);
+                    }
+                    tm1_objects.forEach(applyExpanded);
+            
+                    return {
+                      instance: inst,
+                      expanded: instExpanded,
+                      tm1_objects: tm1_objects
+                    };
+                  });
+
 
                   console.log('tree_data ===', $scope.values.tree_data)
                 })
@@ -399,6 +422,7 @@ arc.directive("arcTemplate", function () {
               return (v === "1" || v === 1 || v === true || v === "Y") ? "1" : "";
             }
 
+            // Execute TI
             function executeUpdateTI(instance, objType, obj, method) {
             
               const tiUrl = "/Processes('" + TI_UPDATE + "')/tm1.Execute";
@@ -416,13 +440,72 @@ arc.directive("arcTemplate", function () {
               return $tm1.async(FIXED_INSTANCE, "POST", tiUrl, body);
             }
 
+            function runTIsForAllUpdates() {
+              const updatesByUI = $scope.values.updates || {};
+              console.log('updatesByUI ===', updatesByUI)
+              const jobs = [];
+            
+              Object.keys(updatesByUI).forEach((uiType)=> {
+                const perInstance = updatesByUI[uiType] || {};
+                Object.keys(perInstance).forEach(function (inst) {
+                  const perObj = perInstance[inst] || {};
+                  Object.keys(perObj).forEach(function (obj) {
+                    jobs.push({ uiType: uiType, instance: inst, tm1Object: obj });
+                  });
+                });
+              });
+            
+              if (!jobs.length) {
+                return Promise.resolve();
+              }
+
+              console.log('jobs ===', jobs)
+            
+              return Promise.all(
+                jobs.map(function (job) {
+                  return executeUpdateTI(
+                    job.instance,   
+                    job.uiType,     
+                    job.tm1Object,  
+                    "0" 
+                  );
+                })
+              );
+            }
+
+            // snapshotExpanded
+            function snapshotExpanded(treeData) {
+              // { [instance]: { instanceExpanded, nodeExpanded: { [nodeId]: true } } }
+              const map = {}; 
+            
+              (treeData || []).forEach(function (pack) {
+                const inst = pack.instance;
+                if (!inst) return;
+            
+                if (!map[inst]) {
+                  map[inst] = {
+                    instanceExpanded: !!pack.expanded,
+                    nodeExpanded: {}
+                  };
+                }
+            
+                function walk(node) {
+                  if (!node) return;
+                  map[inst].nodeExpanded[node._id] = !!node.expanded;
+                  (node.nodes || []).forEach(walk);
+                }
+            
+                (pack.tm1_objects || []).forEach(walk);
+              });
+            
+              return map;
+            }
+
             // Actions -----------------------
             $scope.onUIChange = function () {
               if (!$scope.selections.user_interface) return;
               $scope.values.tree_data = []
               $scope.loadInstanceObjectTree();
-
-
               $scope.values.form = null;
               $scope.values.formOriginal = null;
               $scope.values.selected_tm1_object = null;
@@ -492,44 +575,49 @@ arc.directive("arcTemplate", function () {
               return Object.keys($scope.values.updates).length > 0;
             };
 
-            $scope.onSaveAll = function () {
+            $scope.onSaveAll = async function () {
               if (!$scope.hasUpdates()) return;
+            
               $scope.values.loading = true;
               $scope.values.error = null;
             
-          
-              const body = buildUpdatePayloadsFromUpdates();
-              if (!body.length) {
+              try {
+                const body = buildUpdatePayloadsFromUpdates();
+                if (!body.length) {
+                  return;
+                }
+            
+                const url = "/Cubes('" + CUBE_NAME + "')/tm1.Update";
+            
+                // write back
+                await $tm1.async(FIXED_INSTANCE, "POST", url, body);
+            
+                // execute ti
+                await runTIsForAllUpdates(0);
+            
+                // reload tree
+                await $scope.loadInstanceObjectTree();
+            
+                $scope.values.updates = {};
+                $scope.values.updatesMeta = {};
+            
+                if ($scope.values.selected_tm1_object &&
+                    $scope.values.selected_tm1_object.node &&
+                    $scope.values.selected_tm1_object.node.info) {
+                  $scope.values.formOriginal = angular.copy($scope.values.form);
+                  $scope.values.selected_tm1_object.node.info = angular.copy($scope.values.form);
+                }
+            
+              } catch (err) {
+                $scope.values.error =
+                  (err && err.data && err.data.error && err.data.error.message) ||
+                  err.statusText ||
+                  err.message ||
+                  "Save failed";
+              } finally {
                 $scope.values.loading = false;
-                return;
+                $scope.$applyAsync();
               }
-            
-              const url = "/Cubes('" + CUBE_NAME + "')/tm1.Update";       
-            
-              $tm1.async(FIXED_INSTANCE, "POST", url, body)
-
-                .then(function (res) {
-                  $scope.values.updates = {};
-                  $scope.values.updatesMeta = {};
-
-                  if ($scope.values.selected_tm1_object &&
-                      $scope.values.selected_tm1_object.node &&
-                      $scope.values.selected_tm1_object.node.info) {
-                    $scope.values.formOriginal = angular.copy($scope.values.form);
-                    $scope.values.selected_tm1_object.node.info = angular.copy($scope.values.form);
-                  }
-                })
-                .catch(function (err) {
-                  $scope.values.error =
-                    (err && err.data && err.data.error && err.data.error.message) ||
-                    err.statusText ||
-                    err.message ||
-                    "Save failed";
-                })
-                .finally(function () {
-                  $scope.values.loading = false;
-                  $scope.$applyAsync();
-                });
             };
 
             $scope.onDiscardAll = function () {
