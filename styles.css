@@ -291,6 +291,11 @@
   border-left-color: var(--primary)
 }
 
+.tree-node.disabled{
+  pointer-events: none;
+  opacity: .5;
+}
+
 /* Status ------------------------------------------- */
 .status-light {
   width: 8px;

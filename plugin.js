@@ -67,24 +67,16 @@ arc.directive("arcTemplate", function () {
             $scope.values = { 
                 current_user: '',
                 loading: false,
-                error: null,
-                user_interface_options: [],
+                tm1_object_type: null,
+                tm1_object_type_options: [],
                 tree_data: [],
                 selected_tm1_object: null,
                 selected_tm1_object_id: null,
                 updates: {},
-                updatesMeta: {},
+                updates_meta: {},
                 form: {},
-                formOriginal: {},
-                sign_off_options: [
-                  { label: "Y", value: "1" },
-                  { label: "N", value: "" }
-                ]
+                form_original: {},
             };
-
-            $scope.selections = { 
-              user_interface: null 
-            };  
 
             // Utils
             function emptyInfo() {
@@ -201,7 +193,6 @@ arc.directive("arcTemplate", function () {
             // Load elements from a dimension
             $scope.loadElements = function (dim, container) {
                 $scope.values.loading = true;
-                $scope.values.error = null;
         
                 const restPath = `/Dimensions('${dim}')/Hierarchies('${dim}')/Elements?$select=Name&$filter=Level eq 0`;
                 $tm1.async(FIXED_INSTANCE, 'GET', restPath)
@@ -210,14 +201,14 @@ arc.directive("arcTemplate", function () {
                     $scope.values[container] = list;
 
                     // default
-                    if (container === 'user_interface_options' && list.length) {
-                      $scope.selections.user_interface = list[1].Name;
+                    if (container === 'tm1_object_type_options' && list.length) {
+                      $scope.values.tm1_object_type = list[1].Name;
+                      console.log('list ===', list)
                       $timeout($scope.onUIChange, 0);
                     }
                 })
                 .catch(function (err) {
-                    $scope.values.error =
-                    err?.data?.error?.message || err?.statusText || "Connection failed";
+                  console.log('loadElements error: ', err)
                 })
                 .finally(function () {
                     $scope.values.loading = false;
@@ -384,7 +375,7 @@ arc.directive("arcTemplate", function () {
             }
 
             // Fetch documentation cube values
-            function fetchDocCells(uiType) {
+            function fetchDocCells(tm1ObjectType) {
               const mdx = `
                 SELECT
                   CrossJoin(
@@ -394,7 +385,7 @@ arc.directive("arcTemplate", function () {
                   { TM1DRILLDOWNMEMBER({[${DIM_TM1_OBJECT}].[${DIM_TM1_OBJECT}].Members}, ALL, RECURSIVE) } ON ROWS
                 FROM [${CUBE_NAME}]
                 WHERE (
-                  [${DIM_TM1_OBJECT_TYPE}].[${DIM_TM1_OBJECT_TYPE}].[${uiType}],
+                  [${DIM_TM1_OBJECT_TYPE}].[${DIM_TM1_OBJECT_TYPE}].[${tm1ObjectType}],
                   [${DIM_UPDATE_RECORD}].[${DIM_UPDATE_RECORD}].[${ELEM_UPDATE}]
                 )
               `;
@@ -446,14 +437,14 @@ arc.directive("arcTemplate", function () {
 
             // Load Tree 
             $scope.loadInstanceObjectTree = async function () {
-              const uiType = $scope.selections.user_interface;
-              if (!uiType) return Promise.resolve();
+              const tm1ObjectType = $scope.values.tm1_object_type;
+              if (!tm1ObjectType) return Promise.resolve();
             
               const prevExpanded = snapshotExpanded($scope.values.tree_data);
             
               $scope.values.loading = true;
             
-              return Promise.all([fetchEdges(uiType), fetchDocCells(uiType)])
+              return Promise.all([fetchEdges(tm1ObjectType), fetchDocCells(tm1ObjectType)])
                 .then(function ([edges, doc]) {
                   let baseTree = buildTreeFromEdges(edges);
 
@@ -502,8 +493,7 @@ arc.directive("arcTemplate", function () {
                   console.log("tree_data ===", $scope.values.tree_data);
                 })
                 .catch(function (err) {
-                  $scope.values.error =
-                    err?.data?.error?.message || err?.statusText || "Load failed";
+                  console.log('loadInstanceObjectTree error: ', err)  
                 })
                 .finally(function () {
                   $scope.values.loading = false;
@@ -512,43 +502,43 @@ arc.directive("arcTemplate", function () {
             };
 
             // Build update record
-            function ensureUpdatesBucket(uiType, instance, obj) {
-              if (!$scope.values.updates[uiType]) $scope.values.updates[uiType] = {};
-              if (!$scope.values.updates[uiType][instance]) $scope.values.updates[uiType][instance] = {};
-              if (!$scope.values.updates[uiType][instance][obj]) $scope.values.updates[uiType][instance][obj] = {};
-              return $scope.values.updates[uiType][instance][obj];
+            function ensureUpdatesBucket(tm1ObjectType, instance, obj) {
+              if (!$scope.values.updates[tm1ObjectType]) $scope.values.updates[tm1ObjectType] = {};
+              if (!$scope.values.updates[tm1ObjectType][instance]) $scope.values.updates[tm1ObjectType][instance] = {};
+              if (!$scope.values.updates[tm1ObjectType][instance][obj]) $scope.values.updates[tm1ObjectType][instance][obj] = {};
+              return $scope.values.updates[tm1ObjectType][instance][obj];
             }
 
-            function ensureUpdatesMetaWithOriginal(uiType, instance, obj, originalInfo) {
-              if (!$scope.values.updatesMeta[uiType]) $scope.values.updatesMeta[uiType] = {};
-              if (!$scope.values.updatesMeta[uiType][instance]) $scope.values.updatesMeta[uiType][instance] = {};
-              if (!$scope.values.updatesMeta[uiType][instance][obj]) {
-                $scope.values.updatesMeta[uiType][instance][obj] = {
+            function ensureUpdatesMetaWithOriginal(tm1ObjectType, instance, obj, originalInfo) {
+              if (!$scope.values.updates_meta[tm1ObjectType]) $scope.values.updates_meta[tm1ObjectType] = {};
+              if (!$scope.values.updates_meta[tm1ObjectType][instance]) $scope.values.updates_meta[tm1ObjectType][instance] = {};
+              if (!$scope.values.updates_meta[tm1ObjectType][instance][obj]) {
+                $scope.values.updates_meta[tm1ObjectType][instance][obj] = {
                   original: angular.copy(originalInfo || {})
                 };
               }
-              return $scope.values.updatesMeta[uiType][instance][obj];
+              return $scope.values.updates_meta[tm1ObjectType][instance][obj];
             }
 
-            function cleanupUpdatesBucketIfEmpty(uiType, instance, obj) {
-              const box = $scope.values.updates[uiType]?.[instance]?.[obj];
+            function cleanupUpdatesBucketIfEmpty(tm1ObjectType, instance, obj) {
+              const box = $scope.values.updates[tm1ObjectType]?.[instance]?.[obj];
               if (box && Object.keys(box).length === 0) {
-                delete $scope.values.updates[uiType][instance][obj];
+                delete $scope.values.updates[tm1ObjectType][instance][obj];
             
-                if (Object.keys($scope.values.updates[uiType][instance]).length === 0) {
-                  delete $scope.values.updates[uiType][instance];
+                if (Object.keys($scope.values.updates[tm1ObjectType][instance]).length === 0) {
+                  delete $scope.values.updates[tm1ObjectType][instance];
                 }
-                if (Object.keys($scope.values.updates[uiType]).length === 0) {
-                  delete $scope.values.updates[uiType];
+                if (Object.keys($scope.values.updates[tm1ObjectType]).length === 0) {
+                  delete $scope.values.updates[tm1ObjectType];
                 }
             
-                if ($scope.values.updatesMeta[uiType]?.[instance]?.[obj]) {
-                  delete $scope.values.updatesMeta[uiType][instance][obj];
-                  if (Object.keys($scope.values.updatesMeta[uiType][instance]).length === 0) {
-                    delete $scope.values.updatesMeta[uiType][instance];
+                if ($scope.values.updates_meta[tm1ObjectType]?.[instance]?.[obj]) {
+                  delete $scope.values.updates_meta[tm1ObjectType][instance][obj];
+                  if (Object.keys($scope.values.updates_meta[tm1ObjectType][instance]).length === 0) {
+                    delete $scope.values.updates_meta[tm1ObjectType][instance];
                   }
-                  if (Object.keys($scope.values.updatesMeta[uiType]).length === 0) {
-                    delete $scope.values.updatesMeta[uiType];
+                  if (Object.keys($scope.values.updates_meta[tm1ObjectType]).length === 0) {
+                    delete $scope.values.updates_meta[tm1ObjectType];
                   }
                 }
               }
@@ -573,16 +563,15 @@ arc.directive("arcTemplate", function () {
             }
 
             // Init 
-            $scope.loadElements(DIM_TM1_OBJECT_TYPE, 'user_interface_options');
+            $scope.loadElements(DIM_TM1_OBJECT_TYPE, 'tm1_object_type_options');
             loadCurrentUser()
 
             // Actions 
             $scope.onUIChange = function () {
-              if (!$scope.selections.user_interface) return;
-              $scope.values.tree_data = []
+              if (!$scope.values.tm1_object_type) return;
               $scope.loadInstanceObjectTree();
               $scope.values.form = null;
-              $scope.values.formOriginal = null;
+              $scope.values.form_original = null;
               $scope.values.selected_tm1_object = null;
               $scope.values.selected_tm1_object_id = null;
             };
@@ -600,7 +589,7 @@ arc.directive("arcTemplate", function () {
               data.expanded = !data.expanded;
             
               $scope.values.form = null;
-              $scope.values.formOriginal = null;
+              $scope.values.form_original = null;
               $scope.values.selected_tm1_object = null;
               $scope.values.selected_tm1_object_id = null;
             };
@@ -619,7 +608,7 @@ arc.directive("arcTemplate", function () {
               if (!payload.node.info) payload.node.info = {};
               
               $scope.values.form = payload.node.info;
-              $scope.values.formOriginal = angular.copy($scope.values.form);
+              $scope.values.form_original = angular.copy($scope.values.form);
             
             });
 
@@ -627,24 +616,24 @@ arc.directive("arcTemplate", function () {
               const curSel = $scope.values.selected_tm1_object || {};
               const instance = curSel.instance;
               const node = curSel.node;
-              const uiType = $scope.selections.user_interface;
-              if (!instance || !node || !uiType) return;
+              const tm1ObjectType = $scope.values.tm1_object_type;
+              if (!instance || !node || !tm1ObjectType) return;
             
               const tm1Object = node.tm1_object;
               const cur = $scope.values.form[fieldKey];         
-              const old = $scope.values.formOriginal[fieldKey];
+              const old = $scope.values.form_original[fieldKey];
             
               if (cur === old) {
                 // update to orginal -> remove from updates 
-                const bucket = $scope.values.updates[uiType]?.[instance]?.[tm1Object];
+                const bucket = $scope.values.updates[tm1ObjectType]?.[instance]?.[tm1Object];
                 if (bucket && bucket.hasOwnProperty(fieldKey)) {
                   delete bucket[fieldKey];
-                  cleanupUpdatesBucketIfEmpty(uiType, instance, tm1Object);
+                  cleanupUpdatesBucketIfEmpty(tm1ObjectType, instance, tm1Object);
                 }
               } else {
-                ensureUpdatesMetaWithOriginal(uiType, instance, tm1Object, $scope.values.formOriginal);
+                ensureUpdatesMetaWithOriginal(tm1ObjectType, instance, tm1Object, $scope.values.form_original);
                 // new update -> add to updates
-                const bucket = ensureUpdatesBucket(uiType, instance, tm1Object);
+                const bucket = ensureUpdatesBucket(tm1ObjectType, instance, tm1Object);
                 bucket[fieldKey] = cur;
               }
               node.info[fieldKey] = cur;
@@ -658,7 +647,6 @@ arc.directive("arcTemplate", function () {
               if (!$scope.hasUpdates()) return;
             
               $scope.values.loading = true;
-              $scope.values.error = null;
             
               try {
                 const body = buildUpdatePayloadsFromUpdates();
@@ -675,21 +663,17 @@ arc.directive("arcTemplate", function () {
                 await $scope.loadInstanceObjectTree();
             
                 $scope.values.updates = {};
-                $scope.values.updatesMeta = {};
+                $scope.values.updates_meta = {};
             
                 if ($scope.values.selected_tm1_object &&
                     $scope.values.selected_tm1_object.node &&
                     $scope.values.selected_tm1_object.node.info) {
-                  $scope.values.formOriginal = angular.copy($scope.values.form);
+                  $scope.values.form_original = angular.copy($scope.values.form);
                   $scope.values.selected_tm1_object.node.info = angular.copy($scope.values.form);
                 }
             
               } catch (err) {
-                $scope.values.error =
-                  (err && err.data && err.data.error && err.data.error.message) ||
-                  err.statusText ||
-                  err.message ||
-                  "Save failed";
+                console.log('onSaveAll error: ', err)
               } finally {
                 $scope.values.loading = false;
                 $scope.$applyAsync();
@@ -697,8 +681,8 @@ arc.directive("arcTemplate", function () {
             };
 
             $scope.onDiscardAll = function () {
-              Object.keys($scope.values.updatesMeta).forEach(uiType => {
-                const perUI = $scope.values.updatesMeta[uiType] || {};
+              Object.keys($scope.values.updates_meta).forEach(uiType => {
+                const perUI = $scope.values.updates_meta[uiType] || {};
             
                 Object.keys(perUI).forEach(inst => {
                   const perInst = perUI[inst] || {};
@@ -719,7 +703,7 @@ arc.directive("arcTemplate", function () {
             
                     if (isCurrent) {
                       $scope.values.form = angular.copy(original);
-                      $scope.values.formOriginal = angular.copy(original);
+                      $scope.values.form_original = angular.copy(original);
                       $scope.values.selected_tm1_object.node.info = $scope.values.form;
                     }
                   });
@@ -727,7 +711,7 @@ arc.directive("arcTemplate", function () {
               });
             
               $scope.values.updates = {};
-              $scope.values.updatesMeta = {};
+              $scope.values.updates_meta = {};
             };
 
             $scope.onManagerSignOff = async function () {
@@ -774,12 +758,16 @@ arc.directive("treeNode", function ($compile) {
     scope: {
       node: "=",
       instance: "=",
-      selectedId: "="
+      selectedId: "=",
+      isLoading: "=" 
     },
     template: `
       <li 
         class="tree-node" 
-        ng-class="{'is-selected': selectedId === node._id}"
+        ng-class="{
+          'is-selected': selectedId === node._id, 
+          'disabled': isLoading
+        }"
       >
         <div 
           class="tree-row"
@@ -814,6 +802,7 @@ arc.directive("treeNode", function ($compile) {
               node="c"
               instance="instance"
               selected-id="selectedId"
+              is-loading="isLoading"
             >
             </tree-node>
           </ul>`;
@@ -825,6 +814,9 @@ arc.directive("treeNode", function ($compile) {
       };
 
       scope.onRowClick = function (node, $event) {
+        if (scope.isLoading) {
+          return;
+        }
         $event.stopPropagation();
 
         if (!scope.isLeaf(node)) {

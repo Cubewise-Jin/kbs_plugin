@@ -27,11 +27,11 @@
           <select 
             id="uiSelect"
             class="kb-select kb-select--flex"
-            ng-model="selections.user_interface"
+            ng-model="values.tm1_object_type"
             ng-change="onUIChange()"
-            ng-disabled="values.loading || values.error"
+            ng-disabled="values.loading"
           >
-            <option ng-repeat="e in values.user_interface_options track by e.Name" value="{{e.Name}}">
+            <option ng-repeat="e in values.tm1_object_type_options track by e.Name" value="{{e.Name}}">
               {{e.Name}}
             </option>
           </select>
@@ -58,7 +58,9 @@
               node="node"
               instance="data.instance"
               selected-id="values.selected_tm1_object_id"
-              on-select="onSelectNode(node, instance)">
+              on-select="onSelectNode(node, instance)"
+              is-loading="values.loading"
+            >
             </tree-node>
           </ul>
         </div>
