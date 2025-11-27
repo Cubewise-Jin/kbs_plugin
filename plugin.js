@@ -48,7 +48,8 @@ arc.directive("arcTemplate", function () {
               "Additional Information",
               "User Interface",
               "Managers Sign Off",
-              "Status"
+              "Status",
+              "Used"
             ];
           
             // === Data holders ===
@@ -140,9 +141,6 @@ arc.directive("arcTemplate", function () {
                 });
               });
             
-              console.log("updates ===", updatesByUI);
-              console.log("payload ===", payload);
-            
               return payload;
             }
 
@@ -229,6 +227,55 @@ arc.directive("arcTemplate", function () {
                   nodes: mergeTree(node.nodes || [], getInfo, instance, level + 1, currentPath)
                 };
               });
+            }
+
+            function isNodeUsed(node) {
+              return node && node.info && (node.info.Used === "1" || node.info.Used === 1);
+            }
+
+            function filterTreeByUsed(nodes) {
+              const result = [];
+            
+              (nodes || []).forEach(function (node) {
+                node.nodes = filterTreeByUsed(node.nodes || []);
+            
+                const selfUsed = isNodeUsed(node);
+                const hasChild = node.nodes && node.nodes.length > 0;
+            
+                if (selfUsed || hasChild) {
+                  result.push(node);
+                }
+              });
+            
+              return result;
+            }
+            
+
+            function snapshotExpanded(treeData) {
+              // { [instance]: { instanceExpanded, nodeExpanded: { [nodeId]: true } } }
+              const map = {}; 
+            
+              (treeData || []).forEach(function (pack) {
+                const inst = pack.instance;
+                if (!inst) return;
+            
+                if (!map[inst]) {
+                  map[inst] = {
+                    instanceExpanded: !!pack.expanded,
+                    nodeExpanded: {}
+                  };
+                }
+            
+                function walk(node) {
+                  if (!node) return;
+                  map[inst].nodeExpanded[node._id] = !!node.expanded;
+                  (node.nodes || []).forEach(walk);
+                }
+            
+                (pack.tm1_objects || []).forEach(walk);
+              });
+            
+              return map;
             }
 
             // === Run MDX and expand ===
@@ -329,47 +376,60 @@ arc.directive("arcTemplate", function () {
             $scope.loadInstanceObjectTree = function () {
               const uiType = $scope.selections.user_interface;
               if (!uiType) return Promise.resolve();
-    
+            
               const prevExpanded = snapshotExpanded($scope.values.tree_data);
+            
               $scope.values.loading = true;
-             
+            
               return Promise.all([fetchEdges(), fetchDocCells(uiType)])
-                .then(([edges, doc]) => {
+                .then(function ([edges, doc]) {
                   const baseTree = buildTreeFromEdges(edges);
-
-                  $scope.values.tree_data = doc.instances.map((inst) => {
-                    const tm1_objects = mergeTree(
+            
+                  let nextTreeData = doc.instances.map(function (inst) {
+                    const merged = mergeTree(
                       baseTree,
-                      (o) => doc.cellMap[`${inst}|${o}`],
+                      function (o) {
+                        return doc.cellMap[inst + "|" + o];
+                      },
                       inst
                     );
             
+                    const filtered = filterTreeByUsed(merged);
                     const instSnap = prevExpanded[inst];
                     const instExpanded = instSnap ? instSnap.instanceExpanded : true;
                     const nodeExpandedMap = instSnap ? instSnap.nodeExpanded : {};
             
-                    function applyExpanded(node) {
-                      if (nodeExpandedMap[node._id]) {
-                        node.expanded = true;
+                    if (instSnap) {
+                      function applyExpanded(node) {
+                        if (nodeExpandedMap[node._id]) {
+                          node.expanded = true;
+                        }
+                        (node.nodes || []).forEach(applyExpanded);
                       }
-                      (node.nodes || []).forEach(applyExpanded);
+                      filtered.forEach(applyExpanded);
                     }
-                    tm1_objects.forEach(applyExpanded);
             
                     return {
                       instance: inst,
+                      isInstance: true,
                       expanded: instExpanded,
-                      tm1_objects: tm1_objects
+                      tm1_objects: filtered
                     };
                   });
-
-
-                  console.log('tree_data ===', $scope.values.tree_data)
+            
+                  nextTreeData = nextTreeData.filter(function (pack) {
+                    return pack.tm1_objects && pack.tm1_objects.length > 0;
+                  });
+            
+                  $scope.values.tree_data = nextTreeData;
+            
+                  console.log("tree_data ===", $scope.values.tree_data);
                 })
-                .catch((err) => {
-                  $scope.values.error = err?.data?.error?.message || err?.statusText || "Load failed";
+                .catch(function (err) {
+                  $scope.values.error =
+                    err?.data?.error?.message || err?.statusText || "Load failed";
                 })
-                .finally(() => {
+                .finally(function () {
                   $scope.values.loading = false;
                   $scope.$applyAsync();
                 });
@@ -442,7 +502,6 @@ arc.directive("arcTemplate", function () {
 
             function runTIsForAllUpdates() {
               const updatesByUI = $scope.values.updates || {};
-              console.log('updatesByUI ===', updatesByUI)
               const jobs = [];
             
               Object.keys(updatesByUI).forEach((uiType)=> {
@@ -458,8 +517,6 @@ arc.directive("arcTemplate", function () {
               if (!jobs.length) {
                 return Promise.resolve();
               }
-
-              console.log('jobs ===', jobs)
             
               return Promise.all(
                 jobs.map(function (job) {
@@ -471,34 +528,6 @@ arc.directive("arcTemplate", function () {
                   );
                 })
               );
-            }
-
-            // snapshotExpanded
-            function snapshotExpanded(treeData) {
-              // { [instance]: { instanceExpanded, nodeExpanded: { [nodeId]: true } } }
-              const map = {}; 
-            
-              (treeData || []).forEach(function (pack) {
-                const inst = pack.instance;
-                if (!inst) return;
-            
-                if (!map[inst]) {
-                  map[inst] = {
-                    instanceExpanded: !!pack.expanded,
-                    nodeExpanded: {}
-                  };
-                }
-            
-                function walk(node) {
-                  if (!node) return;
-                  map[inst].nodeExpanded[node._id] = !!node.expanded;
-                  (node.nodes || []).forEach(walk);
-                }
-            
-                (pack.tm1_objects || []).forEach(walk);
-              });
-            
-              return map;
             }
 
             // Actions -----------------------
@@ -685,12 +714,19 @@ arc.directive("treeNode", function ($compile) {
       selectedId: "="
     },
     template: `
-      <li class="tree-node" ng-class="{'is-selected': selectedId === node._id}">
-        <div class="tree-row"
-             ng-click="$event.stopPropagation(); $emit('tree:select', { instance: instance, node: node })">
-          <div class="caret-box"
-               ng-class="{'hidden': !(node.nodes && node.nodes.length)}"
-               ng-click="$event.stopPropagation(); (node.nodes && node.nodes.length) && (node.expanded = !node.expanded)">
+      <li 
+        class="tree-node" 
+        ng-class="{'is-selected': selectedId === node._id}"
+      >
+        <div 
+          class="tree-row"
+          ng-click="$event.stopPropagation(); $emit('tree:select', { instance: instance, node: node })"
+        >
+          <div 
+            class="caret-box"
+            ng-class="{'hidden': !(node.nodes && node.nodes.length)}"
+            ng-click="$event.stopPropagation(); (node.nodes && node.nodes.length) && (node.expanded = !node.expanded)"
+          >
             <i class="caret" ng-class="{'open': node.expanded}"></i>
           </div>
           <span class="tree-label">{{node.tm1_object}}</span>
@@ -718,8 +754,8 @@ arc.directive("treeNode", function ($compile) {
 
       scope.statusClass = function (status) {
         if (!status) return 'st-not-start';
-      
-        switch (status.toLowerCase()) {
+        
+        switch (status) {
           case 'Not Start':
             return 'st-not-start';
           case 'Start':
