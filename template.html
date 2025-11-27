@@ -126,18 +126,15 @@
         </div>
       
         <!-- Relevant Biz Process -->
-        <div 
-          class="field-wrap flex-column"
-          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id || isFormReadOnly()}"
-        >
-          <label class="field-label">Relevant Biz Process</label>
-          <input 
-            class="kb-input" 
-            ng-disabled="true"
-            ng-model="values.form['Relevant Biz Process']"
-            ng-change="onFieldChange('Relevant Biz Process')"
-          ></textarea>
-        </div>
+        <kb-multi-select
+          label="Relevant Biz Process"
+          field-key="Relevant Biz Process"
+          options="values.business_process_options"
+          form="values.form"
+          disabled="values.loading || !values.selected_tm1_object_id || isFormReadOnly()"
+          read-only="isFormReadOnly()"
+          on-change="onFieldChange('Relevant Biz Process')">
+        </kb-multi-select>
       
         <!-- Additional Information -->
         <div 
@@ -155,19 +152,15 @@
         </div>
       
         <!-- User Interface -->
-        <div 
-          class="field-wrap flex-column"
-          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id || isFormReadOnly()}"
-        >
-          <label class="field-label">User Interface</label>
-          <input 
-            class="kb-input" 
-            type="text"
-            ng-disabled="true"
-            ng-model="values.form['User Interface']"
-            ng-change="onFieldChange('User Interface')"
-          >
-        </div>
+        <kb-multi-select
+          label="User Interface"
+          field-key="User Interface"
+          options="values.user_interface_options"
+          form="values.form"
+          disabled="values.loading || !values.selected_tm1_object_id || isFormReadOnly()"
+          read-only="isFormReadOnly()"
+          on-change="onFieldChange('User Interface')">
+        </kb-multi-select>
       
         <!-- Managers Sign Off -->
         <div 
@@ -180,10 +173,10 @@
               ng-click="onManagerSignOff()" 
               ng-disabled="values.loading || !values.selected_tm1_object_id || isFormReadOnly()"
             >
-              Sign-Off By
+              Sign-Off
             </button>
             <button 
-              class="kb-btn outline" 
+              class="kb-btn fill" 
               ng-click="onManagerReopen()" 
               ng-disabled="values.loading || !values.selected_tm1_object_id || !isFormReadOnly()"
             >
@@ -193,6 +186,5 @@
         </div>
       </div>
     </div>
-    
   </div>
 </div>

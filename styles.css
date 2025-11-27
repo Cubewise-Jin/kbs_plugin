@@ -38,16 +38,23 @@
   cursor: pointer; 
   border: 1px solid var(--primary); 
 }
+
 .kb-btn.fill { 
   background: var(--primary); 
   color:#fff; 
 }
+
 .kb-btn.outline { 
   color: var(--primary); 
 }
+
 .kb-btn:disabled { 
   opacity: .5; 
   cursor: default;
+}
+
+.kb-btn:focus { 
+  outline: none;
 }
 
 /* Layout panel ------------------------------------------- */
@@ -170,7 +177,7 @@
 
 .kb-select:disabled {
   opacity: .6;
-  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .select-box .kb-select-icon {
@@ -185,12 +192,98 @@
   color: var(--label-color);
 }
 
+.field-wrap.disabled .select-box .kb-select-icon{
+  opacity: .6;
+}
+
 .kb-select:focus + .kb-select-icon{
   transform: translateY(-35%) rotate(180deg);
   color: var(--secondary);
 }
 
 .kb-select--flex { flex: 1; }
+
+/* Multi Select ------------------------------------------- */
+.field-wrap.disabled .select-box--multi{
+  pointer-events: none;
+}
+
+.field-wrap.disabled .select-box--multi .kb-tag{
+  opacity: .8;
+}
+
+.select-box--multi {
+  position: relative;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  min-height: 32px;
+  padding: 4px 30px 4px 6px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.select-box--multi .kb-tag-list{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.select-box--multi .kb-tag {
+  background: var(--secondary);
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.select-box--multi .kb-tag-close {
+  font-weight: 700;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.field-wrap.disabled .kb-tag-close {
+  display: none;
+}
+
+.kb-multi-menu{
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  max-height: 180px;
+  overflow: auto;
+  padding: 4px 0;
+  background: #fff;
+  z-index: 1000;
+  position: absolute;
+  left: 0;
+  width: 100%;
+  box-shadow: 0px 4px 6px -2px #ababab;
+}
+
+.kb-multi-menu--bottom {
+  top: 100%;
+  bottom: auto;
+}
+
+.kb-multi-menu--top {
+  bottom: 100%;
+  top: auto;
+}
+
+.kb-multi-item{
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.kb-multi-item:hover{
+  background: var(--primary-light);
+}
 
 /* Tree ------------------------------------------- */
 .kb-tree {
@@ -200,6 +293,10 @@
   padding-right: 8px;
   width: 100%;
   margin-top: 8px;
+}
+
+.tree-container{
+  margin-bottom: 2px;
 }
 
 /* Instance row */

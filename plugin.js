@@ -37,6 +37,8 @@ arc.directive("arcTemplate", function () {
             const DIM_TM1_OBJECT = "TM1 Object";
             const DIM_UPDATE_RECORD = "Update Record";
             const DIM_M_SYS_DOCUMENTATION = "M Sys Documentation"
+            const DIM_BUSINESS_PROCESS = "p_Business Process";
+            const DIM_USER_INTERFACE = "p_User Interface";
             const ELEM_UPDATE = "Update Input";
             const TI_UPDATE = "Cub.Sys Documentation.Update Sign Off";
             let edgesCache = null;
@@ -66,9 +68,11 @@ arc.directive("arcTemplate", function () {
             // Data holders
             $scope.values = { 
                 current_user: '',
-                loading: false,
+                loading: true,
                 tm1_object_type: null,
                 tm1_object_type_options: [],
+                business_process_options: [],
+                user_interface_options: [],
                 tree_data: [],
                 selected_tm1_object: null,
                 selected_tm1_object_id: null,
@@ -76,6 +80,10 @@ arc.directive("arcTemplate", function () {
                 updates_meta: {},
                 form: {},
                 form_original: {},
+
+                // for multi select
+                user_interface_candidate: null,
+                biz_process_candidate: null
             };
 
             // Utils
@@ -192,8 +200,6 @@ arc.directive("arcTemplate", function () {
 
             // Load elements from a dimension
             $scope.loadElements = function (dim, container) {
-                $scope.values.loading = true;
-        
                 const restPath = `/Dimensions('${dim}')/Hierarchies('${dim}')/Elements?$select=Name&$filter=Level eq 0`;
                 $tm1.async(FIXED_INSTANCE, 'GET', restPath)
                 .then(function (resp) {
@@ -203,16 +209,12 @@ arc.directive("arcTemplate", function () {
                     // default
                     if (container === 'tm1_object_type_options' && list.length) {
                       $scope.values.tm1_object_type = list[1].Name;
-                      console.log('list ===', list)
                       $timeout($scope.onUIChange, 0);
                     }
                 })
                 .catch(function (err) {
                   console.log('loadElements error: ', err)
                 })
-                .finally(function () {
-                    $scope.values.loading = false;
-                });
             };
 
             // Load TM1 object hierarchy edges
@@ -490,7 +492,7 @@ arc.directive("arcTemplate", function () {
             
                   $scope.values.tree_data = nextTreeData;
             
-                  console.log("tree_data ===", $scope.values.tree_data);
+                  // console.log("tree_data ===", $scope.values.tree_data);
                 })
                 .catch(function (err) {
                   console.log('loadInstanceObjectTree error: ', err)  
@@ -564,6 +566,8 @@ arc.directive("arcTemplate", function () {
 
             // Init 
             $scope.loadElements(DIM_TM1_OBJECT_TYPE, 'tm1_object_type_options');
+            $scope.loadElements(DIM_BUSINESS_PROCESS, 'business_process_options');
+            $scope.loadElements(DIM_USER_INTERFACE, 'user_interface_options');
             loadCurrentUser()
 
             // Actions 
@@ -846,6 +850,192 @@ arc.directive("treeNode", function ($compile) {
     }
   };
 });
+
+arc.directive("kbMultiSelect", ["$document", "$rootScope", "$timeout", function ($document, $rootScope, $timeout) {
+  var nextId = 1;
+
+  return {
+    restrict: "E",
+    scope: {
+      label: "@",
+      fieldKey: "@",
+      options: "=",
+      form: "=",
+      disabled: "=",
+      onChange: "&"
+    },
+    template: `
+      <div 
+        class="field-wrap flex-column"
+        ng-class="{'disabled': disabled}"
+      >
+        <label class="field-label">{{label}}</label>
+
+        <div class="select-box select-box--multi" ng-click="toggleOpen($event)">
+          <div class="kb-tag-list">
+            <span 
+              class="kb-tag"
+              ng-repeat="v in selectedList track by v"
+            >
+              {{v}}
+              <span 
+                class="kb-tag-close"
+                ng-click="$event.stopPropagation(); remove(v)"
+                ng-if="!disabled"
+              >x</span>
+            </span>
+          </div>
+
+          <i class="fa fa-chevron-down kb-select-icon" aria-hidden="true"></i>
+        
+          <div 
+            class="kb-multi-menu kb-multi-menu--bottom"
+            ng-show="menuOpen"
+          >
+            <div 
+              class="kb-multi-item"
+              ng-repeat="o in options track by o.Name"
+            >
+              <input 
+                type="checkbox"
+                ng-checked="isChecked(o.Name)"
+                ng-click="toggle(o.Name, $event)"
+              />
+              <span ng-click="toggle(o.Name, $event)">{{o.Name}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `,
+    link: function (scope, element) {
+      var myId = nextId++;
+
+      function splitMulti(str) {
+        if (!str) return [];
+        return String(str)
+          .split("|")
+          .map(function (s) { return s.trim(); })
+          .filter(function (s) { return s.length > 0; });
+      }
+
+      function joinMulti(arr) {
+        if (!arr || !arr.length) return "";
+        return arr.join("|");
+      }
+
+      function syncFromForm() {
+        if (!scope.form) {
+          scope.selectedList = [];
+          return;
+        }
+        var raw = scope.form[scope.fieldKey];
+        scope.selectedList = splitMulti(raw);
+      }
+
+      scope.selectedList = [];
+      scope.menuOpen = false;
+
+      scope.$watch(
+        function () {
+          return scope.form && scope.form[scope.fieldKey];
+        },
+        function () {
+          syncFromForm();
+        }
+      );
+
+      function updateMenuPosition() {
+        var menuEl = element[0].querySelector(".kb-multi-menu");
+        var boxEl = element[0].querySelector(".select-box--multi");
+        if (!menuEl || !boxEl) return;
+
+        menuEl.classList.remove("kb-multi-menu--top", "kb-multi-menu--bottom");
+
+        var rect = boxEl.getBoundingClientRect();
+        var ESTIMATED_MENU_HEIGHT = 220;
+        var spaceBelow = window.innerHeight - rect.bottom;
+        var spaceAbove = rect.top;
+
+        if (spaceBelow < ESTIMATED_MENU_HEIGHT && spaceAbove > spaceBelow) {
+          menuEl.classList.add("kb-multi-menu--top");
+        } else {
+          menuEl.classList.add("kb-multi-menu--bottom");
+        }
+      }
+
+      scope.toggleOpen = function ($event) {
+        if (scope.disabled) return;
+        if ($event) $event.stopPropagation();
+
+        var willOpen = !scope.menuOpen;
+        scope.menuOpen = willOpen;
+
+        if (willOpen) {
+          $rootScope.$broadcast("kbMultiSelect:open", myId);
+          $timeout(updateMenuPosition, 0);
+        }
+      };
+
+      scope.$on("kbMultiSelect:open", function (evt, openedId) {
+        if (openedId !== myId && scope.menuOpen) {
+          scope.$applyAsync(function () {
+            scope.menuOpen = false;
+          });
+        }
+      });
+
+      function onDocClick(e) {
+        if (!scope.menuOpen) return;
+        if (element[0].contains(e.target)) return;
+
+        scope.$applyAsync(function () {
+          scope.menuOpen = false;
+        });
+      }
+
+      $document.on("click", onDocClick);
+
+      scope.$on("$destroy", function () {
+        $document.off("click", onDocClick);
+      });
+
+      scope.isChecked = function (name) {
+        return scope.selectedList.indexOf(name) !== -1;
+      };
+
+      scope.toggle = function (name, $event) {
+        if ($event) $event.stopPropagation();
+        if (scope.disabled) return;
+
+        var idx = scope.selectedList.indexOf(name);
+        if (idx === -1) {
+          scope.selectedList.push(name);
+        } else {
+          scope.selectedList.splice(idx, 1);
+        }
+        updateForm();
+      };
+
+      scope.remove = function (name) {
+        if (scope.disabled) return;
+
+        var idx = scope.selectedList.indexOf(name);
+        if (idx >= 0) {
+          scope.selectedList.splice(idx, 1);
+          updateForm();
+        }
+      };
+
+      function updateForm() {
+        if (!scope.form) return;
+        scope.form[scope.fieldKey] = joinMulti(scope.selectedList);
+        if (scope.onChange) {
+          scope.onChange({ fieldKey: scope.fieldKey });
+        }
+      }
+    }
+  };
+}]);
 
 
 
