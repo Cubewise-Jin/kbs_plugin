@@ -157,7 +157,7 @@ arc.directive("arcTemplate", function () {
 
                     // default
                     if (container === 'user_interface_options' && list.length) {
-                      $scope.selections.user_interface = list[0].Name;
+                      $scope.selections.user_interface = list[4].Name;
                       $timeout($scope.onUIChange, 0);
                     }
                 })
@@ -249,7 +249,6 @@ arc.directive("arcTemplate", function () {
             
               return result;
             }
-            
 
             function snapshotExpanded(treeData) {
               // { [instance]: { instanceExpanded, nodeExpanded: { [nodeId]: true } } }
@@ -373,7 +372,7 @@ arc.directive("arcTemplate", function () {
             }
 
             // Load Tree 
-            $scope.loadInstanceObjectTree = function () {
+            $scope.loadInstanceObjectTree = async function () {
               const uiType = $scope.selections.user_interface;
               if (!uiType) return Promise.resolve();
             
@@ -720,12 +719,11 @@ arc.directive("treeNode", function ($compile) {
       >
         <div 
           class="tree-row"
-          ng-click="$event.stopPropagation(); $emit('tree:select', { instance: instance, node: node })"
+          ng-click="onRowClick(node, $event)"
         >
           <div 
             class="caret-box"
-            ng-class="{'hidden': !(node.nodes && node.nodes.length)}"
-            ng-click="$event.stopPropagation(); (node.nodes && node.nodes.length) && (node.expanded = !node.expanded)"
+            ng-class="{'hidden': isLeaf(node)}"
           >
             <i class="caret" ng-class="{'open': node.expanded}"></i>
           </div>
@@ -746,11 +744,27 @@ arc.directive("treeNode", function ($compile) {
               ng-repeat="c in node.nodes track by c._id"
               node="c"
               instance="instance"
-              selected-id="selectedId">
+              selected-id="selectedId"
+            >
             </tree-node>
           </ul>`;
         element.append($compile(tpl)(scope));
       }
+
+      scope.isLeaf = function (node) {
+        return !(node.nodes && node.nodes.length > 0);
+      };
+
+      scope.onRowClick = function (node, $event) {
+        $event.stopPropagation();
+
+        if (!scope.isLeaf(node)) {
+          node.expanded = !node.expanded;
+          return;
+        }
+
+        scope.$emit('tree:select', { instance: scope.instance, node: node });
+      };
 
       scope.statusClass = function (status) {
         if (!status) return 'st-not-start';
