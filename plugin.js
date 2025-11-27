@@ -29,7 +29,7 @@ arc.directive("arcTemplate", function () {
         },
         controller: ["$scope", "$rootScope", "$http", "$tm1", "$translate", "$timeout", function ($scope, $rootScope, $http, $tm1, $translate, $timeout) {
 
-            // === Constants ===
+            // Constants
             const FIXED_INSTANCE = "c000_kbs";
             const CUBE_NAME = "Sys Documentation"; 
             const DIM_TM1_OBJECT_TYPE = "TM1 Object Type"
@@ -39,6 +39,7 @@ arc.directive("arcTemplate", function () {
             const DIM_M_SYS_DOCUMENTATION = "M Sys Documentation"
             const ELEM_UPDATE = "Update Input";
             const TI_UPDATE = "Cub.Sys Documentation.Update Sign Off";
+            let edgesCache = null;
 
             const M_SYS_DOCUMENTATION_KEYS = [
               "Requirement",
@@ -51,9 +52,20 @@ arc.directive("arcTemplate", function () {
               "Status",
               "Used"
             ];
+
+            const TM1_OBJECT_TYPE_MAP = {
+              PAW: "PAW",
+              Application: "Applications",
+              Cube: "Cubes",
+              Dimension: "Dimensions",
+              Process: "Processes",
+              Chore: "Chores",
+              UX: "UX"
+            }
           
-            // === Data holders ===
+            // Data holders
             $scope.values = { 
+                current_user: '',
                 loading: false,
                 error: null,
                 user_interface_options: [],
@@ -74,7 +86,7 @@ arc.directive("arcTemplate", function () {
               user_interface: null 
             };  
 
-            // === Utils ===
+            // Utils
             function emptyInfo() {
               return M_SYS_DOCUMENTATION_KEYS.reduce((acc, k) => ((acc[k] = ""), acc), {});
             }
@@ -98,19 +110,20 @@ arc.directive("arcTemplate", function () {
               return dfs(pack.tm1_objects);
             }
 
+            function esc(s) { 
+              return String(s || "").replace(/'/g, "''"); 
+            }
 
-            function esc(s) { return String(s || "").replace(/'/g, "''"); }
-            function normalizeSignOff(v){ return (v==="1"||v===1||v===true||v==="Y")?"1":""; }
-            function toStoredValue(measure, val){
-              return (measure === "Managers Sign Off") ? normalizeSignOff(val) : (val == null ? "" : String(val));
+            function toStoredValue(val) {
+              return  (val == null ? "" : String(val));
             }
             
             function buildUpdatePayloadsFromUpdates() {
-              const updatesByUI = $scope.values.updates || {};
+              const updates = $scope.values.updates || {};
               const payload = [];
             
-              Object.keys(updatesByUI).forEach(function (uiType) {
-                const perInst = updatesByUI[uiType] || {};
+              Object.keys(updates).forEach(function (uiType) {
+                const perInst = updates[uiType] || {};
             
                 Object.keys(perInst).forEach(function (inst) {
                   const perObj = perInst[inst] || {};
@@ -120,7 +133,7 @@ arc.directive("arcTemplate", function () {
             
                     Object.keys(perMeasure).forEach(function (measure) {
                       const rawVal = perMeasure[measure];
-                      const value = toStoredValue(measure, rawVal);
+                      const value = toStoredValue(rawVal);
             
                       payload.push({
                         "Cells": [
@@ -141,15 +154,56 @@ arc.directive("arcTemplate", function () {
                 });
               });
             
+              console.log('updates ===', updates)
               return payload;
             }
 
-            // === Load elements from a dimension ===
+            function loadAllEdgesOnce() {
+              if (edgesCache) {
+                return Promise.resolve(edgesCache);
+              }
+            
+              const url =
+                `/Dimensions('${DIM_TM1_OBJECT}')/Hierarchies('${DIM_TM1_OBJECT}')/Edges` +
+                `?$select=ParentName,ComponentName,Weight`;
+            
+              return $tm1.async(FIXED_INSTANCE, "GET", url).then(function (resp) {
+                const rows = (resp && resp.data && resp.data.value) || [];
+            
+                const childrenByParent = {};
+                const allNodes = new Set();
+            
+                rows.forEach(function (e) {
+                  const parent = e.ParentName;
+                  const child  = e.ComponentName;
+            
+                  if (!childrenByParent[parent]) {
+                    childrenByParent[parent] = [];
+                  }
+                  childrenByParent[parent].push(child);
+            
+                  allNodes.add(parent);
+                  allNodes.add(child);
+                });
+            
+                edgesCache = { childrenByParent, allNodes };
+                return edgesCache;
+              });
+            }
+
+            // Get current user
+            function loadCurrentUser() {
+              $tm1.instance(FIXED_INSTANCE).then(function (instanceInfo) {
+                $scope.values.current_user = instanceInfo.user.FriendlyName
+              });
+            }
+
+            // Load elements from a dimension
             $scope.loadElements = function (dim, container) {
                 $scope.values.loading = true;
                 $scope.values.error = null;
         
-                const restPath = `/Dimensions('${dim}')/Hierarchies('${dim}')/Elements?$select=Name`;
+                const restPath = `/Dimensions('${dim}')/Hierarchies('${dim}')/Elements?$select=Name&$filter=Level eq 0`;
                 $tm1.async(FIXED_INSTANCE, 'GET', restPath)
                 .then(function (resp) {
                     const list =  resp?.data?.value || [];
@@ -157,7 +211,7 @@ arc.directive("arcTemplate", function () {
 
                     // default
                     if (container === 'user_interface_options' && list.length) {
-                      $scope.selections.user_interface = list[4].Name;
+                      $scope.selections.user_interface = list[1].Name;
                       $timeout($scope.onUIChange, 0);
                     }
                 })
@@ -170,30 +224,49 @@ arc.directive("arcTemplate", function () {
                 });
             };
 
-            $scope.loadElements(DIM_TM1_OBJECT_TYPE, 'user_interface_options');
-
-            // === Load TM1 object hierarchy edges ===
-            function fetchEdges() {
-              const url = `/Dimensions('${DIM_TM1_OBJECT}')/Hierarchies('${DIM_TM1_OBJECT}')/Edges?$select=ParentName,ComponentName,Weight`;
-              return $tm1.async(FIXED_INSTANCE, "GET", url).then((resp) => {
-                const rows = resp?.data?.value || [];
-                const childrenByParent = {};
-                const allNodes = new Set();
-
-                rows.forEach((e) => {
-                  const parent = e.ParentName;
-                  const child = e.ComponentName;
-                  allNodes.add(parent);
-                  allNodes.add(child);
-                  if (!childrenByParent[parent]) childrenByParent[parent] = [];
-                  childrenByParent[parent].push(child);
+            // Load TM1 object hierarchy edges
+            function fetchEdges(uiTypeKey) {
+              const typeName = TM1_OBJECT_TYPE_MAP[uiTypeKey];
+              if (!typeName) {
+                return Promise.resolve({ childrenByParent: {}, allNodes: new Set() });
+              }
+            
+              const targetRoot = `Total ${typeName}`; 
+            
+              return loadAllEdgesOnce().then(function (base) {
+                const childrenByParent = base.childrenByParent;
+            
+                const allowed = new Set();
+            
+                function dfs(name) {
+                  if (!name || allowed.has(name)) return;
+                  allowed.add(name);
+                  const childs = childrenByParent[name] || [];
+                  for (var i = 0; i < childs.length; i++) {
+                    dfs(childs[i]);
+                  }
+                }
+            
+                dfs(targetRoot);
+            
+                const filteredChildrenByParent = {};
+                allowed.forEach(function (parent) {
+                  const childs = (childrenByParent[parent] || []).filter(function (c) {
+                    return allowed.has(c);
+                  });
+                  if (childs.length) {
+                    filteredChildrenByParent[parent] = childs;
+                  }
                 });
-
-                return { childrenByParent, allNodes };
+            
+                return {
+                  childrenByParent: filteredChildrenByParent,
+                  allNodes: allowed
+                };
               });
             }
 
-            // === Build nested tree from edges ===
+            // Build nested tree from edges
             function buildTreeFromEdges(edges) {
               const { childrenByParent, allNodes } = edges;
               const allChildren = new Set(
@@ -277,7 +350,7 @@ arc.directive("arcTemplate", function () {
               return map;
             }
 
-            // === Run MDX and expand ===
+            // Run MDX and expand
             function executeMDXExpanded(mdx) {
               const url =
                 "/ExecuteMDX?" +
@@ -310,7 +383,7 @@ arc.directive("arcTemplate", function () {
                 });
             }
 
-            // === Fetch documentation cube values ===
+            // Fetch documentation cube values
             function fetchDocCells(uiType) {
               const mdx = `
                 SELECT
@@ -380,9 +453,13 @@ arc.directive("arcTemplate", function () {
             
               $scope.values.loading = true;
             
-              return Promise.all([fetchEdges(), fetchDocCells(uiType)])
+              return Promise.all([fetchEdges(uiType), fetchDocCells(uiType)])
                 .then(function ([edges, doc]) {
-                  const baseTree = buildTreeFromEdges(edges);
+                  let baseTree = buildTreeFromEdges(edges);
+
+                  if (baseTree.length === 1 && /^Total\s+/i.test(baseTree[0].tm1_object)) {
+                    baseTree = baseTree[0].nodes || [];
+                  }
             
                   let nextTreeData = doc.instances.map(function (inst) {
                     const merged = mergeTree(
@@ -477,10 +554,6 @@ arc.directive("arcTemplate", function () {
               }
             }
 
-            function normalizeSignOff(v) {
-              return (v === "1" || v === 1 || v === true || v === "Y") ? "1" : "";
-            }
-
             // Execute TI
             function executeUpdateTI(instance, objType, obj, method) {
             
@@ -499,37 +572,11 @@ arc.directive("arcTemplate", function () {
               return $tm1.async(FIXED_INSTANCE, "POST", tiUrl, body);
             }
 
-            function runTIsForAllUpdates() {
-              const updatesByUI = $scope.values.updates || {};
-              const jobs = [];
-            
-              Object.keys(updatesByUI).forEach((uiType)=> {
-                const perInstance = updatesByUI[uiType] || {};
-                Object.keys(perInstance).forEach(function (inst) {
-                  const perObj = perInstance[inst] || {};
-                  Object.keys(perObj).forEach(function (obj) {
-                    jobs.push({ uiType: uiType, instance: inst, tm1Object: obj });
-                  });
-                });
-              });
-            
-              if (!jobs.length) {
-                return Promise.resolve();
-              }
-            
-              return Promise.all(
-                jobs.map(function (job) {
-                  return executeUpdateTI(
-                    job.instance,   
-                    job.uiType,     
-                    job.tm1Object,  
-                    "0" 
-                  );
-                })
-              );
-            }
+            // Init 
+            $scope.loadElements(DIM_TM1_OBJECT_TYPE, 'user_interface_options');
+            loadCurrentUser()
 
-            // Actions -----------------------
+            // Actions 
             $scope.onUIChange = function () {
               if (!$scope.selections.user_interface) return;
               $scope.values.tree_data = []
@@ -538,6 +585,14 @@ arc.directive("arcTemplate", function () {
               $scope.values.formOriginal = null;
               $scope.values.selected_tm1_object = null;
               $scope.values.selected_tm1_object_id = null;
+            };
+
+            $scope.isFormReadOnly = function () {
+              if ($scope.values.loading) {
+                return true;
+              }
+              const form = $scope.values.form || {};
+              return form["Managers Sign Off"] === "1";
             };
 
             $scope.onToggleInstance = function (data, $event) {
@@ -562,8 +617,7 @@ arc.directive("arcTemplate", function () {
               $scope.values.selected_tm1_object_id = payload.node._id;
 
               if (!payload.node.info) payload.node.info = {};
-              payload.node.info["Managers Sign Off"] = normalizeSignOff(payload.node.info["Managers Sign Off"]);
-
+              
               $scope.values.form = payload.node.info;
               $scope.values.formOriginal = angular.copy($scope.values.form);
             
@@ -575,10 +629,6 @@ arc.directive("arcTemplate", function () {
               const node = curSel.node;
               const uiType = $scope.selections.user_interface;
               if (!instance || !node || !uiType) return;
-
-              if (fieldKey === "Managers Sign Off") {
-                $scope.values.form[fieldKey] = normalizeSignOff($scope.values.form[fieldKey]);
-              }
             
               const tm1Object = node.tm1_object;
               const cur = $scope.values.form[fieldKey];         
@@ -586,12 +636,13 @@ arc.directive("arcTemplate", function () {
             
               if (cur === old) {
                 // update to orginal -> remove from updates 
-                if ($scope.values.updates[instance]?.[tm1Object]?.hasOwnProperty(fieldKey)) {
-                  delete $scope.values.updates[instance][tm1Object][fieldKey];
+                const bucket = $scope.values.updates[uiType]?.[instance]?.[tm1Object];
+                if (bucket && bucket.hasOwnProperty(fieldKey)) {
+                  delete bucket[fieldKey];
                   cleanupUpdatesBucketIfEmpty(uiType, instance, tm1Object);
                 }
               } else {
-                ensureUpdatesMetaWithOriginal(instance, tm1Object, $scope.values.formOriginal);
+                ensureUpdatesMetaWithOriginal(uiType, instance, tm1Object, $scope.values.formOriginal);
                 // new update -> add to updates
                 const bucket = ensureUpdatesBucket(uiType, instance, tm1Object);
                 bucket[fieldKey] = cur;
@@ -619,9 +670,6 @@ arc.directive("arcTemplate", function () {
             
                 // write back
                 await $tm1.async(FIXED_INSTANCE, "POST", url, body);
-            
-                // execute ti
-                await runTIsForAllUpdates(0);
             
                 // reload tree
                 await $scope.loadInstanceObjectTree();
@@ -682,6 +730,22 @@ arc.directive("arcTemplate", function () {
               $scope.values.updatesMeta = {};
             };
 
+            $scope.onManagerSignOff = async function () {
+              if ($scope.isFormReadOnly()) return;
+              const fieldKey = "Managers Sign Off"
+              $scope.values.form[fieldKey] = "1";
+              $scope.onFieldChange(fieldKey)
+              await $scope.onSaveAll()
+            };
+
+            $scope.onManagerReopen = async function () {
+              if (!$scope.isFormReadOnly()) return;
+              const fieldKey = "Managers Sign Off"
+              $scope.values.form[fieldKey] = "";
+              $scope.onFieldChange(fieldKey)
+              await $scope.onSaveAll()
+            };
+
             //Trigger an event after the login screen
             $scope.$on("login-reload", function (event, args) {
 
@@ -727,7 +791,12 @@ arc.directive("treeNode", function ($compile) {
           >
             <i class="caret" ng-class="{'open': node.expanded}"></i>
           </div>
-          <span class="tree-label">{{node.tm1_object}}</span>
+          <span 
+            class="tree-label"
+            title="{{ node.tm1_object }}"
+          >
+            {{node.tm1_object}}
+          </span>
           <div 
             class="status-light" 
             ng-class="statusClass(node.info.Status)"

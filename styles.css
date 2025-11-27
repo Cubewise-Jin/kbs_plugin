@@ -81,6 +81,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .kb-bar{
@@ -110,8 +111,8 @@
 /* Input ------------------------------------------- */
 .field-wrap.disabled .kb-input{
   opacity: .6;
-  cursor: not-allowed;
   background: transparent;
+  pointer-events: none;
 }
 
 .field-wrap.disabled .field-label{
@@ -262,7 +263,7 @@
 .tree-row {
   display: flex;
   align-items: center;
-  padding-right: 4px;
+  padding-right: 8px;
   padding-left: 0;
   border-radius: var(--border-radius-sm);
   cursor: pointer;
@@ -275,6 +276,10 @@
 .tree-label { 
   font-size: 13px;
   padding: 2px 0;
+  width: 85%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .tree-node.is-selected > .tree-row{
@@ -295,11 +300,11 @@
 }
 
 .st-not-start {
-  background: #cd5050;
+  background: #df5252;
 }
 
 .st-start {
-  background: #4d7db7;
+  background: #2789ff;
 }
 
 .st-partial {
@@ -307,7 +312,7 @@
 }
 
 .st-finished {
-  background: #327d46; 
+  background: #0b932f; 
 }
 
 /* Right panel ------------------------------------------- */
@@ -329,6 +334,10 @@
   font-weight: 600;
   font-size: 18px;
   padding: 0 12px;
+  max-width:90%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .field-container{

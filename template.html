@@ -71,6 +71,7 @@
         <span class="tm1-object-title">TM1 Object</span>
         <span 
           class="tm1-object-name"
+          title="{{values.selected_tm1_object_id}}"
           ng-if="values.selected_tm1_object_id"
           ng-bind="values.selected_tm1_object_id">
         </span>
@@ -80,7 +81,7 @@
         <!-- Requirement -->
         <div 
           class="field-wrap flex-column"
-          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id}"
+          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id || isFormReadOnly()}"
         >
           <label class="field-label">Requirement</label>
           <textarea 
@@ -95,7 +96,7 @@
         <!-- How to Use -->
         <div 
           class="field-wrap flex-column"
-          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id}"
+          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id || isFormReadOnly()}"
         >
           <label class="field-label">How to Use</label>
           <textarea 
@@ -110,7 +111,7 @@
         <!-- Maintenance -->
         <div 
           class="field-wrap flex-column"
-          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id}"
+          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id || isFormReadOnly()}"
         >
           <label class="field-label">Maintenance</label>
           <textarea 
@@ -125,7 +126,7 @@
         <!-- Relevant Biz Process -->
         <div 
           class="field-wrap flex-column"
-          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id}"
+          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id || isFormReadOnly()}"
         >
           <label class="field-label">Relevant Biz Process</label>
           <input 
@@ -139,7 +140,7 @@
         <!-- Additional Information -->
         <div 
           class="field-wrap flex-column"
-          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id}"
+          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id || isFormReadOnly()}"
         >
           <label class="field-label">Additional Information</label>
           <textarea 
@@ -154,7 +155,7 @@
         <!-- User Interface -->
         <div 
           class="field-wrap flex-column"
-          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id}"
+          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id || isFormReadOnly()}"
         >
           <label class="field-label">User Interface</label>
           <input 
@@ -169,19 +170,23 @@
         <!-- Managers Sign Off -->
         <div 
           class="field-wrap flex-column"
-          ng-class="{'disabled': values.loading || !values.selected_tm1_object_id}"
         >
           <label class="field-label">Managers Sign Off</label>
-          <div class="select-box">
-            <select 
-              class="kb-select"
-              ng-disabled="values.loading || !values.selected_tm1_object_id"
-              ng-model="values.form['Managers Sign Off']"
-              ng-options="opt.value as opt.label for opt in values.sign_off_options"
-              ng-change="onFieldChange('Managers Sign Off')"
+          <div class="button-box">
+            <button 
+              class="kb-btn fill" 
+              ng-click="onManagerSignOff()" 
+              ng-disabled="values.loading || !values.selected_tm1_object_id || isFormReadOnly()"
             >
-            </select>
-            <i class="fa fa-chevron-down kb-select-icon" aria-hidden="true"></i>
+              Sign-Off By
+            </button>
+            <button 
+              class="kb-btn outline" 
+              ng-click="onManagerReopen()" 
+              ng-disabled="values.loading || !values.selected_tm1_object_id || !isFormReadOnly()"
+            >
+              Re-Open
+            </button>
           </div>
         </div>
       </div>
